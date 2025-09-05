@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/stock-ahora/api-stock/internal/config_lib"
 )
@@ -34,7 +33,6 @@ func LoadSecretManager(ctx context.Context) (*SecretApp, error) {
 	}
 
 	//todo: eliminar este log
-
 	log.Printf("Secreto obtenido: %s", raw)
 
 	var cfg SecretApp
@@ -42,11 +40,4 @@ func LoadSecretManager(ctx context.Context) (*SecretApp, error) {
 		return nil, fmt.Errorf("parsear secreto JSON: %w", err)
 	}
 	return &cfg, nil
-}
-
-func getEnv(k, def string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
-	}
-	return def
 }

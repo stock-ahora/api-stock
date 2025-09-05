@@ -1,12 +1,21 @@
 package config
 
+import (
+	"os"
+
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+)
+
 type SecretApp struct {
-	Host string `json:"host"`
-	Port int    `json:"port"`
-	User string `json:"username"`
-	Pass string `json:"password"`
-	Name string `json:"dbname"`
-	SSL  string `json:"sslmode"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	User     string `json:"username"`
+	Pass     string `json:"password"`
+	Name     string `json:"dbname"`
+	SSL      string `json:"sslmode"`
+	S3Bucket string `json:"bucket"`
+	S3Region string `json:"region"`
 }
 
 type DBConfig struct {
@@ -16,6 +25,19 @@ type DBConfig struct {
 	Password string
 	DBName   string
 	SSLMode  string
+}
+
+type UploadService struct {
+	S3Client    *s3.Client
+	Uploader    *manager.Uploader
+	Bucket      string
+	PublicBase  string
+	MaxUploadMB int64
+}
+
+type S3Config struct {
+	Region string
+	Bucket string
 }
 
 /// mapping objects
@@ -29,4 +51,19 @@ func (s SecretApp) ToDBConfig() DBConfig {
 		DBName:   s.Name,
 		SSLMode:  s.SSL,
 	}
+}
+
+func (s SecretApp) ToS3Config() S3Config {
+	return S3Config{
+		Region: s.S3Region,
+		Bucket: s.S3Bucket,
+	}
+}
+
+// functions for configs
+func getEnv(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
 }
