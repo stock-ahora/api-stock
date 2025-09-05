@@ -24,8 +24,8 @@ func main() {
 	}
 	log.Println("DB Connection Established")
 	defer db.Commit()
-	log.Printf("Conectando a DB %s:%d/%s con usuario %s",
-		cfg.Host, cfg.Port, cfg.User, cfg.User)
+
+	config.RunMigrations(cfg.ToDBConfig())
 
 	r := httpserver.NewRouter()
 
