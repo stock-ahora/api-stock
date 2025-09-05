@@ -1,18 +1,40 @@
 package main
 
 import (
-    "log"
-    "net/http"
+	"context"
+	"log"
+	"net/http"
 
-    "github.com/stock-ahora/api-stock/internal/http"
+	"github.com/stock-ahora/api-stock/internal/config"
+	"github.com/stock-ahora/api-stock/internal/http"
 )
 
 func main() {
-    r := httpserver.NewRouter() // ver internal/http/router.go
 
-    addr := ":8080"
-    log.Printf("API listening on %s", addr)
-    if err := http.ListenAndServe(addr, r); err != nil {
-        log.Fatal(err)
-    }
+	ctx := context.Background()
+
+	cfg, err := config.LoadSecretManager(ctx)
+	if err != nil {
+		log.Fatalf("config error: %v", err)
+	}
+
+	db, err := config.NewPostgresDB(cfg.ToDBConfig())
+	if err != nil {
+		log.Fatalf("DB error: %v", err)
+	}
+	log.Println("DB Connection Established")
+	defer db.Commit()
+	log.Printf("Conectando a DB %s:%d/%s con usuario %s",
+		cfg.Host, cfg.Port, cfg.User, cfg.User)
+
+	r := httpserver.NewRouter()
+
+	addr := ":8082"
+	log.Printf("API listening on %s", addr)
+	if err := http.ListenAndServe(addr, r); err != nil {
+		log.Fatal(err)
+	}
+
 }
+
+/// Configuración de la base de datos
