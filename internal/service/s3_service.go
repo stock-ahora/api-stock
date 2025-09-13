@@ -22,19 +22,32 @@ type S3config struct {
 	config.UploadService
 }
 
+// interface pública del servicio
+type S3Uploader interface {
+	HandleUpload(file multipart.File, prefix string) (string, error)
+}
+
+// implementación concreta
 type S3Svc struct {
 	config S3config
 }
 
-type S3Service interface {
-	HandleUpload(w http.ResponseWriter, r *http.Request)
-}
-
-func NewS3Svs(config S3config) S3Service {
+// constructor del servicio
+func NewS3Svs(config S3config) *S3Svc {
 	return &S3Svc{config: config}
 }
 
+// todo modificar servicio de subida de archivos a s3
+
 func (s *S3Svc) HandleUpload(w http.ResponseWriter, r *http.Request) {
+	key, error := s.doHandleUpload(w, r)
+	if error != nil {
+		return
+	}
+	fmt.Println("Archivo subido con éxito. Key:", key)
+}
+
+func (s *S3Svc) doHandleUpload(w http.ResponseWriter, r *http.Request) (string, error) {
 
 	s3Var := s.config
 
@@ -44,15 +57,20 @@ func (s *S3Svc) HandleUpload(w http.ResponseWriter, r *http.Request) {
 
 	if err := r.ParseMultipartForm(s3Var.MaxUploadMB * 1024 * 1024); err != nil {
 		httpError(w, http.StatusRequestEntityTooLarge, fmt.Errorf("archivo demasiado grande o inválido: %w", err))
-		return
+		return "", err
 	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		httpError(w, http.StatusBadRequest, fmt.Errorf("campo 'file' requerido: %w", err))
-		return
+		return "", err
 	}
-	defer file.Close()
+	defer func(file multipart.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
 
 	filename := sanitizeFilename(header.Filename)
 	contentType := detectContentType(file, header)
@@ -60,7 +78,7 @@ func (s *S3Svc) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		seeker.Seek(0, io.SeekStart)
 	}
 
-	key := buildObjectKey(filename, r.FormValue("prefix"))
+	key := buildObjectKey(filename, "new-stocks")
 
 	_, err = s3Var.Uploader.Upload(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s3Var.Bucket),
@@ -70,12 +88,17 @@ func (s *S3Svc) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		httpError(w, http.StatusInternalServerError, fmt.Errorf("error subiendo a S3: %w", err))
-		return
+		return "", err
 	}
 
 	publicURL := fmt.Sprintf("%s/%s", s3Var.PublicBase, key)
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(fmt.Sprintf(`{"key":%q,"public_url":%q}`, key, publicURL)))
+	_, err = w.Write([]byte(fmt.Sprintf(`{"key":%q,"public_url":%q}`, key, publicURL)))
+	if err != nil {
+		return "", nil
+	}
+
+	return key, nil
 }
 
 func buildObjectKey(filename, prefix string) string {

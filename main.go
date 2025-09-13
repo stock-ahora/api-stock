@@ -32,7 +32,7 @@ func main() {
 
 	//inicializamos el router
 
-	r := httpserver.NewRouter()
+	r := httpserver.NewRouter(*s3, db)
 
 	addr := ":8082"
 	log.Printf("API listening on %s", addr)

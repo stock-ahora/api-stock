@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/joho/godotenv"
 	"github.com/stock-ahora/api-stock/internal/config_lib"
 )
 
 func LoadSecretManager(ctx context.Context) (*SecretApp, error) {
-	//secretID := getEnv("APP_SECRET_ID", "EMPTY")
-	//todo: cambiar el secretID por la variable de entorno
-	secretID := "secret-app-true-stock-29f55d1b"
+
+	secretID := getEnv("APP_SECRET_ID", "EMPTY")
 	log.Printf("config_lib ID %s", secretID)
 
 	if secretID == "" {
@@ -40,4 +40,10 @@ func LoadSecretManager(ctx context.Context) (*SecretApp, error) {
 		return nil, fmt.Errorf("parsear secreto JSON: %w", err)
 	}
 	return &cfg, nil
+}
+
+func init() {
+	if err := godotenv.Load(); err != nil {
+		log.Printf("No se encontró archivo .env: %v", err)
+	}
 }
