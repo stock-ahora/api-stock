@@ -18,6 +18,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.8.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.7 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/streadway/amqp v1.1.0 // indirect
 )
 
 require (

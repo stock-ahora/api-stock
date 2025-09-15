@@ -8,16 +8,18 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/stock-ahora/api-stock/internal/utils"
 )
 
 // RunMigrations corre todas las migraciones pendientes
 func RunMigrations(cfg DBConfig) {
 	user := url.QueryEscape(cfg.User)
 	pass := url.QueryEscape(cfg.Password)
+	portInt, err := utils.ConverToint(cfg.Port)
 
 	migrateURL := fmt.Sprintf(
 		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		user, pass, cfg.Host, cfg.Port, cfg.DBName, cfg.SSLMode,
+		user, pass, cfg.Host, portInt, cfg.DBName, cfg.SSLMode,
 	)
 
 	m, err := migrate.New("file://internal/db/migrations", migrateURL)

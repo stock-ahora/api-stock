@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stock-ahora/api-stock/internal/dto"
 	"github.com/stock-ahora/api-stock/internal/models"
+	"github.com/stock-ahora/api-stock/internal/service/eventservice"
 	"gorm.io/gorm"
 )
 
@@ -18,12 +19,13 @@ type RequestService interface {
 }
 
 type requestService struct {
-	db    *gorm.DB
-	s3Svc *S3Svc
+	db       *gorm.DB
+	s3Svc    *S3Svc
+	eventSvc *eventservice.MQPublisher
 }
 
-func NewRequestService(db *gorm.DB, s3Svc *S3Svc) RequestService {
-	return &requestService{db: db, s3Svc: s3Svc}
+func NewRequestService(db *gorm.DB, s3Svc *S3Svc, eventSvc *eventservice.MQPublisher) RequestService {
+	return &requestService{db: db, s3Svc: s3Svc, eventSvc: eventSvc}
 }
 
 // implementación de metodos
@@ -73,10 +75,25 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto) (models.Request
 		return models.Request{}, err
 	}
 
+	err = r.eventSvc.PublishMovement(sendEventTest())
+	if err != nil {
+		return request, err
+	}
+
 	return request, nil
 }
 
 func (r requestService) Get(uuid uuid.UUID) (models.Request, error) {
 	//TODO implement me
 	panic("implement me")
+}
+
+func sendEventTest() eventservice.MovementEvent {
+	return eventservice.MovementEvent{
+		MovementID: "mov-123",
+		UserID:     "u-456",
+		Action:     "create",
+		Amount:     150.0,
+		Currency:   "USD",
+	}
 }
