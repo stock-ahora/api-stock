@@ -1,0 +1,85 @@
+name: Build and Deploy Go API to EC2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Permisos para autenticación segura con AWS OIDC
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # --- JOB 1: CONSTRUIR Y SUBIR LA IMAGEN A ECR ---
+  build-and-push:
+    name: Build and Push to ECR
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_tag: ${{ steps.build-image.outputs.image_tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  # --- JOB 2: DESPLEGAR LA NUEVA IMAGEN EN LAS INSTANCIAS EC2 ---
+  deploy-to-ec2:
+    name: Deploy to EC2 Instances
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to EC2 via SSM Run Command
+        env:
+          ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:${{ secrets.EC2_INSTANCE_TAG_KEY }},Values=${{ secrets.EC2_INSTANCE_TAG_VALUE }}" \
+            --comment "Deploying new version of api-stock" \
+            --parameters commands="
+              #!/bin/bash
+              # Iniciar sesión en ECR (requiere que la instancia EC2 tenga el rol de IAM correcto)
+              aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+              # Detener y eliminar el contenedor antiguo si existe
+              docker stop api-stock-container || true
+              docker rm api-stock-container || true
+
+              # Hacer pull de la nueva imagen
+              docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+              # Ejecutar el nuevo contenedor
+              docker run -d --name api-stock-container -p 8082:8082 --restart always $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+            "
