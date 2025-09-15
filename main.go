@@ -20,8 +20,6 @@ func main() {
 	//conectamos a la base de datos
 	db := getDbConfig(cfg)
 
-	db.Commit()
-
 	//ejecutamos migraciones
 	config.RunMigrations(cfg.ToDBConfig())
 

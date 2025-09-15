@@ -23,18 +23,25 @@ func NewRouter(s3Config config.UploadService, db *gorm.DB) *chi.Mux {
 	h := handlers.NewStatusHandler()
 	s3Svc := service.NewS3Svs(service.S3config{UploadService: s3Config})
 	requestService := service.NewRequestService(db, s3Svc)
+	handleRequest := &handlers.RequestHandler{Service: requestService}
 
+	initHealthRoutes(r, h)
+
+	initRequestRoutes(r, handleRequest)
+
+	return r
+}
+
+func initHealthRoutes(r *chi.Mux, h *handlers.StatusHandler) {
 	r.Get(HealthPath, func(w http.ResponseWriter, r *http.Request) {
 		h.Health(w)
 	})
+}
 
-	r.Route(S3BasePath, func(r chi.Router) {
-		r.Post("/upload", s3Svc.HandleUpload)
-	})
-
+func initRequestRoutes(r *chi.Mux, requestService *handlers.RequestHandler) {
 	r.Route(RequestBasePath, func(r chi.Router) {
+		r.Get("/", requestService.List)
 		r.Post("/", requestService.Create)
+		r.Get("/{id}", requestService.Get)
 	})
-
-	return r
 }
