@@ -23,7 +23,7 @@ WORKDIR /app
 # Copiar binario desde la etapa anterior
 COPY --from=builder /app/server .
 
-# Exponer el puerto 8080
+# Exponer el puerto 8082
 EXPOSE 8082
 
 # Comando para ejecutar
