@@ -43,14 +43,21 @@ CREATE TABLE "movement" (
                             "product_id" uuid,
                             "date_limit" time,
                             "request_id" uuid,
+                            "movement_type_id" serial,
                             "create_at" timestamp,
                             "updated_at" timestamp
 );
 
+CREATE TABLE "movements_type" (
+                                  "id" serial PRIMARY KEY,
+                                  "name" varchar,
+                                  "description" varchar
+);
+
 CREATE TABLE "request_per_product" (
                                        "id" uuid PRIMARY KEY,
-                                       "request_id" uuid,
-                                       "product_id" uuid
+                                       "product_id" uuid,
+                                       "request_id" uuid
 );
 
 CREATE TABLE "request" (
@@ -86,3 +93,5 @@ ALTER TABLE "movement" ADD CONSTRAINT "movement_request" FOREIGN KEY ("request_i
 ALTER TABLE "request_per_product" ADD CONSTRAINT "request_movement" FOREIGN KEY ("request_id") REFERENCES "request" ("id");
 
 ALTER TABLE "request_per_product" ADD CONSTRAINT "product_request" FOREIGN KEY ("product_id") REFERENCES "movement" ("id");
+
+ALTER TABLE "movements_type" ADD CONSTRAINT "type_movement" FOREIGN KEY ("id") REFERENCES "movement" ("movement_type_id");

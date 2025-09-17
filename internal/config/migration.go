@@ -27,11 +27,11 @@ func RunMigrations(cfg DBConfig) {
 		if err != nil {
 			log.Fatalf("❌ Error creando migrator: %v", err)
 		}
-
-		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-			log.Fatalf("❌ Error aplicando migraciones: %v", err)
-		}
-
-		log.Println("✅ Migraciones aplicadas correctamente")
 	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatalf("❌ Error aplicando migraciones: %v", err)
+	}
+
+	log.Println("✅ Migraciones aplicadas correctamente")
 }
