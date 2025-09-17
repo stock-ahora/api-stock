@@ -15,7 +15,7 @@ jobs:
   # --- JOB 1: CONSTRUIR Y SUBIR LA IMAGEN A ECR ---
   build-and-push:
     name: Build and Push to ECR
-    runs-on: macos-latest
+    runs-on: ubuntu-22.04-arm
     
     outputs:
       image_tag: ${{ steps.build-image.outputs.image_tag }}
