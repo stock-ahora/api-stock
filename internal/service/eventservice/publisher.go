@@ -1,7 +1,6 @@
 package eventservice
 
 import (
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,8 +9,11 @@ import (
 
 type EventPublisher interface {
 	PublishMovement(e MovementEvent) error
-	PublishDocument(e DocumentProcessEvent) error
+	PublishDocument(e RequestProcessEvent) error
 }
+
+const MOVEMENT_TOPIC = "movement.generated"
+const REQUEST_TOPIC = "Request.process"
 
 type MQPublisher struct {
 	Channel    *amqp.Channel
@@ -36,7 +38,7 @@ func (p *MQPublisher) PublishMovement(e MovementEvent) error {
 		e.OccurredAt = time.Now().UTC()
 	}
 
-	rk := "movement." + strings.ToLower(e.Action)
+	rk := MOVEMENT_TOPIC
 
 	headers := amqp.Table{
 		"type":          "movement",
@@ -47,7 +49,7 @@ func (p *MQPublisher) PublishMovement(e MovementEvent) error {
 	return publishJSON(p.Channel, rk, e, headers)
 }
 
-func (p *MQPublisher) PublishDocument(ch *amqp.Channel, e DocumentProcessEvent) error {
+func (p *MQPublisher) PublishRequest(e RequestProcessEvent) error {
 	if e.EventID == "" {
 		e.EventID = newUUID()
 	}
@@ -61,7 +63,7 @@ func (p *MQPublisher) PublishDocument(ch *amqp.Channel, e DocumentProcessEvent) 
 		e.OccurredAt = time.Now().UTC()
 	}
 
-	rk := "document." + strings.ToLower(e.Operation)
+	rk := REQUEST_TOPIC
 
 	headers := amqp.Table{
 		"type":          "document",

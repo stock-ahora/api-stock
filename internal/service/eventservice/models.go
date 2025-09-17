@@ -1,6 +1,10 @@
 package eventservice
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type BaseEvent struct {
 	EventID       string            `json:"event_id"`
@@ -24,12 +28,7 @@ type MovementEvent struct {
 }
 
 // ---- Procesar Documento ----
-type DocumentProcessEvent struct {
+type RequestProcessEvent struct {
 	BaseEvent
-	DocumentID  string            `json:"document_id"`
-	Operation   string            `json:"operation"` // ej: process, validate
-	Bucket      string            `json:"bucket,omitempty"`
-	ObjectKey   string            `json:"object_key,omitempty"`
-	ContentType string            `json:"content_type,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	DocumentId uuid.UUID `json:"document_id"`
 }

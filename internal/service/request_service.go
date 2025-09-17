@@ -46,8 +46,10 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto) (models.Request
 
 	uuidClient, _ := uuid.Parse("8d1b88f0-e5c7-4670-8bbb-3045f9ab3995")
 
+	requestUuid := uuid.New()
+
 	request := models.Request{
-		ID:     uuid.New(),
+		ID:     requestUuid,
 		Status: models.RequestCreated,
 		//ClientAccountID: requestDto.ClientAccountId,
 		ClientAccountID: uuidClient,
@@ -75,7 +77,7 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto) (models.Request
 		return models.Request{}, err
 	}
 
-	err = r.eventSvc.PublishMovement(sendEventTest())
+	err = r.eventSvc.PublishRequest(createdRequestProcess(requestUuid))
 	if err != nil {
 		return request, err
 	}
@@ -88,12 +90,8 @@ func (r requestService) Get(uuid uuid.UUID) (models.Request, error) {
 	panic("implement me")
 }
 
-func sendEventTest() eventservice.MovementEvent {
-	return eventservice.MovementEvent{
-		MovementID: "mov-123",
-		UserID:     "u-456",
-		Action:     "create",
-		Amount:     150.0,
-		Currency:   "USD",
+func createdRequestProcess(documentId uuid.UUID) eventservice.RequestProcessEvent {
+	return eventservice.RequestProcessEvent{
+		DocumentId: documentId,
 	}
 }

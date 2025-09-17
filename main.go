@@ -7,6 +7,7 @@ import (
 
 	"github.com/stock-ahora/api-stock/internal/config"
 	"github.com/stock-ahora/api-stock/internal/http"
+	"github.com/stock-ahora/api-stock/internal/service/consumer"
 	"github.com/stock-ahora/api-stock/internal/service/eventservice"
 	"github.com/streadway/amqp"
 	"gorm.io/gorm"
@@ -30,8 +31,9 @@ func main() {
 
 	log.Printf("S3 Configured: Bucket %s ", s3.Bucket)
 
-	//inicializamos el router
 	connMQ, ch := mqConfig(cfg)
+
+	configListener(connMQ, ch)
 
 	r := httpserver.NewRouter(*s3, db, connMQ, ch)
 
@@ -41,6 +43,18 @@ func main() {
 		log.Fatal(err)
 	}
 
+}
+
+func configListener(connMQ *amqp.Connection, ch *amqp.Channel) {
+	listener := consumer.NewListener(connMQ, ch, "service.queue")
+
+	if err := listener.SetupListener([]string{eventservice.REQUEST_TOPIC, eventservice.MOVEMENT_TOPIC}); err != nil {
+		log.Fatalf("❌ Error en setup listener: %v", err)
+	}
+
+	if err := listener.StartListening(); err != nil {
+		log.Fatalf("❌ Error en listener: %v", err)
+	}
 }
 
 func mqConfig(cfg *config.SecretApp) (*amqp.Connection, *amqp.Channel) {
