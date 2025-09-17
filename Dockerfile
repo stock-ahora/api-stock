@@ -10,7 +10,6 @@ RUN go mod download
 
 # Copiar el resto del código
 COPY . .
-COPY .env .env
 
 # Compilar binario
 RUN go build -o server .
@@ -23,6 +22,7 @@ WORKDIR /app
 
 # Copiar binario desde la etapa anterior
 COPY --from=builder /app/server .
+COPY .env .env
 
 # Exponer el puerto 8082
 EXPOSE 8082
