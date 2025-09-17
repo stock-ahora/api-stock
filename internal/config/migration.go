@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -22,7 +24,10 @@ func RunMigrations(cfg DBConfig) {
 		user, pass, cfg.Host, portInt, cfg.DBName, cfg.SSLMode,
 	)
 
-	m, err := migrate.New("file://internal/db/migrations", migrateURL)
+	path, _ := os.Getwd()
+	migrationsPath := fmt.Sprintf("file://%s/internal/db/migrations", strings.ReplaceAll(path, "\\", "/"))
+
+	m, err := migrate.New(migrationsPath, migrateURL)
 	if err != nil {
 		if err != nil {
 			log.Fatalf("❌ Error creando migrator: %v", err)
