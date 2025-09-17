@@ -57,6 +57,7 @@ CREATE TABLE "movements_type" (
 CREATE TABLE "request_per_product" (
                                        "id" uuid PRIMARY KEY,
                                        "product_id" uuid,
+                                       "movement_id" uuid,
                                        "request_id" uuid
 );
 
@@ -92,6 +93,8 @@ ALTER TABLE "movement" ADD CONSTRAINT "movement_request" FOREIGN KEY ("request_i
 
 ALTER TABLE "request_per_product" ADD CONSTRAINT "request_movement" FOREIGN KEY ("request_id") REFERENCES "request" ("id");
 
-ALTER TABLE "request_per_product" ADD CONSTRAINT "product_request" FOREIGN KEY ("product_id") REFERENCES "movement" ("id");
+ALTER TABLE "request_per_product" ADD CONSTRAINT "product_request" FOREIGN KEY ("product_id") REFERENCES "product" ("id");
 
-ALTER TABLE "movements_type" ADD CONSTRAINT "type_movement" FOREIGN KEY ("id") REFERENCES "movement" ("movement_type_id");
+ALTER TABLE "request_per_product" ADD CONSTRAINT "mov_request" FOREIGN KEY ("movement_id") REFERENCES "movement" ("id");
+
+ALTER TABLE "movement" ADD CONSTRAINT "type_movement" FOREIGN KEY ("movement_type_id") REFERENCES "movements_type" ("id");

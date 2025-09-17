@@ -24,9 +24,7 @@ func RunMigrations(cfg DBConfig) {
 
 	m, err := migrate.New("file://internal/db/migrations", migrateURL)
 	if err != nil {
-		if err != nil {
-			log.Fatalf("❌ Error creando migrator: %v", err)
-		}
+		log.Fatalf("❌ Error creando migrator: %v", err)
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
