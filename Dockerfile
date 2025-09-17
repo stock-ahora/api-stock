@@ -10,6 +10,7 @@ RUN go mod download
 
 # Copiar el resto del código
 COPY . .
+COPY internal/db/migrations internal/db/migrations
 
 # Compilar binario
 RUN go build -o server .
