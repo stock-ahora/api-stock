@@ -15,8 +15,8 @@ jobs:
   # --- JOB 1: CONSTRUIR Y SUBIR LA IMAGEN A ECR ---
   build-and-push:
     name: Build and Push to ECR
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-22.04-arm
+    
     outputs:
       image_tag: ${{ steps.build-image.outputs.image_tag }}
 
@@ -41,6 +41,7 @@ jobs:
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          echo "APP_SECRET_ID=${{ secrets.SECRET_MANAGER_NAME }}" > .env
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT

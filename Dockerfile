@@ -22,6 +22,7 @@ WORKDIR /app
 
 # Copiar binario desde la etapa anterior
 COPY --from=builder /app/server .
+COPY .env .env
 
 # Exponer el puerto 8082
 EXPOSE 8082
