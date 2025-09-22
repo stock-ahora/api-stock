@@ -6,20 +6,23 @@ import (
 	"log"
 
 	"github.com/stock-ahora/api-stock/internal/service/eventservice"
+	"github.com/stock-ahora/api-stock/internal/service/request"
 	"github.com/streadway/amqp"
 )
 
 type Listener struct {
-	channel    *amqp.Channel
-	connection *amqp.Connection
-	queueName  string
+	channel        *amqp.Channel
+	connection     *amqp.Connection
+	queueName      string
+	requestService request.RequestService
 }
 
-func NewListener(conn *amqp.Connection, ch *amqp.Channel, queue string) *Listener {
+func NewListener(conn *amqp.Connection, ch *amqp.Channel, queue string, requestService request.RequestService) *Listener {
 	return &Listener{
-		channel:    ch,
-		connection: conn,
-		queueName:  queue,
+		channel:        ch,
+		connection:     conn,
+		queueName:      queue,
+		requestService: requestService,
 	}
 }
 
@@ -85,7 +88,7 @@ func (l *Listener) StartListening() error {
 					log.Printf("❌ error parseando RequestProcessEvent: %v", err)
 					continue
 				}
-				handleRequestProcess(event)
+				handleRequestProcess(event, l.requestService)
 
 			default:
 				log.Printf("⚠️ No hay handler para routing key: %s", d.RoutingKey)

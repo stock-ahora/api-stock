@@ -12,14 +12,17 @@ type Request struct {
 	Status          RequestStatus `gorm:"type:varchar(50)"`
 	CreatedAt       time.Time     `gorm:"column:create_at;autoCreateTime"`
 	UpdatedAt       time.Time     `gorm:"column:updated_at;autoUpdateTime"`
+	Documents       []Documents   `gorm:"foreignKey:RequestID"`
 }
 
 type Documents struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	S3Path    string    `gorm:"column:s3_path;type:varchar"`
-	RequestID uuid.UUID `gorm:"column:request_id;type:uuid"`
-	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt time.Time `gorm:"column:update_at;autoUpdateTime"`
+	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	S3Path     string    `gorm:"column:s3_path;type:varchar"`
+	RequestID  uuid.UUID `gorm:"column:request_id;type:uuid"`
+	TextractId string    `gorm:"column:textract_id;type:varchar;default:null"`
+	bedrockId  string    `gorm:"column:bedrock_id;type:varchar;default:null"`
+	CreatedAt  time.Time `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt  time.Time `gorm:"column:update_at;autoUpdateTime"`
 }
 
 type RequestStatus string

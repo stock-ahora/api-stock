@@ -1,8 +1,9 @@
-package service
+package s3
 
 import (
 	"context"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 	"time"
@@ -31,7 +32,11 @@ func NewS3Svs(config S3config) *S3Svc {
 
 // todo modificar servicio de subida de archivos a s3
 
-func (s *S3Svc) doHandleUpload(createRequest *dto.CreateRequestDto, path string) (string, error) {
+func (s *S3Svc) GetBucket() string {
+	return s.config.UploadService.Bucket
+}
+
+func (s *S3Svc) DoHandleUpload(createRequest *dto.CreateRequestDto, path string) (string, error) {
 
 	s3Var := s.config
 
@@ -52,6 +57,22 @@ func (s *S3Svc) doHandleUpload(createRequest *dto.CreateRequestDto, path string)
 	}
 
 	return key, err
+}
+
+func (s *S3Svc) GetDocument(key string) (io.ReadCloser, error) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	result, err := s.config.S3Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.config.Bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error al obtener archivo de S3: %w", err)
+	}
+
+	return result.Body, nil
 }
 
 func buildObjectKey(filename, prefix string) string {

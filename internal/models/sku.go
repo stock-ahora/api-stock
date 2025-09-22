@@ -15,3 +15,5 @@ type Sku struct {
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 	Product   Product   `gorm:"references:ID" json:"product,omitempty"`
 }
+
+func (Sku) TableName() string { return "sku" }

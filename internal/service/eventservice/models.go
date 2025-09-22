@@ -30,5 +30,6 @@ type MovementEvent struct {
 // ---- Procesar Documento ----
 type RequestProcessEvent struct {
 	BaseEvent
-	DocumentId uuid.UUID `json:"document_id"`
+	RequestID       uuid.UUID `json:"request_id"`
+	ClientAccountId uuid.UUID `json:"client_account_id"`
 }

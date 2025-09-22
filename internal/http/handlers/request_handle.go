@@ -7,11 +7,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stock-ahora/api-stock/internal/dto"
-	"github.com/stock-ahora/api-stock/internal/service"
+	"github.com/stock-ahora/api-stock/internal/service/request"
 )
 
 type RequestHandler struct {
-	Service service.RequestService
+	Service request.RequestService
 }
 
 func (h *RequestHandler) List(w http.ResponseWriter, r *http.Request) {
