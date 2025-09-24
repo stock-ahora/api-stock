@@ -77,7 +77,7 @@ jobs:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
           service: true-stock-api-client
           cluster: true-stock-cluster
-          wait-for-service-stability: false
+          wait-for-service-stability: true
       
       - name: Check deployment status
         run: |
