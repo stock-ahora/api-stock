@@ -37,7 +37,7 @@ func LoadSecretManager(ctx context.Context) (*SecretApp, error) {
 
 	var cfg SecretApp
 	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
-		return nil, fmt.Errorf("parsear secreto JSON: %w", err)
+		return nil, fmt.Errorf("parsear secreto  JSON: %w", err)
 	}
 	return &cfg, nil
 }
