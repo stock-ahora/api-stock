@@ -5,7 +5,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/stock-ahora/api-stock/internal/utils"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -13,7 +12,7 @@ import (
 
 func NewPostgresDB(cfg DBConfig) (*gorm.DB, error) {
 
-	portInt, err := utils.ConverToint(cfg.Port)
+	portInt := cfg.Port
 
 	dsn := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s TimeZone=UTC",

@@ -9,7 +9,7 @@ import (
 
 type SecretApp struct {
 	Host        string `json:"host"`
-	Port        string `json:"port"`
+	Port        int    `json:"port"`
 	User        string `json:"username"`
 	Pass        string `json:"password"`
 	Name        string `json:"dbname"`
@@ -18,14 +18,14 @@ type SecretApp struct {
 	S3Region    string `json:"region"`
 	MQ_HOST     string `json:"MQ_HOST"`
 	MQ_PASSWORD string `json:"MQ_PASSWORD"`
-	MQ_PORT     string `json:"MQ_PORT"`
+	MQ_PORT     int    `json:"MQ_PORT"`
 	MQ_USER     string `json:"MQ_USER"`
 	MQ_VHOST    string `json:"MQ_VHOST"`
 }
 
 type DBConfig struct {
 	Host     string
-	Port     string
+	Port     int
 	User     string
 	Password string
 	DBName   string
@@ -34,7 +34,7 @@ type DBConfig struct {
 
 type MQConfig struct {
 	Host     string
-	Port     string
+	Port     int
 	User     string
 	Password string
 	VHost    string

@@ -17,8 +17,7 @@ func NewRabbitMq(mq MQConfig) (*amqp.Connection, *amqp.Channel) {
 		RootCAs: rootCAs,
 	}
 
-	url := fmt.Sprintf("amqps://%s:%s@%s:%s/%s", mq.User, mq.Password, mq.Host, mq.Port, mq.VHost)
-
+	url := fmt.Sprintf("amqps://%s:%s@%s:%d/%s", mq.User, mq.Password, mq.Host, mq.Port, mq.VHost)
 	conn, err := amqp.DialTLS(url, tlsConfig)
 	if err != nil {
 		log.Fatalf("❌ Error conectando a RabbitMQ: %v", err)
