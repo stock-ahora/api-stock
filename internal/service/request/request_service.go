@@ -111,6 +111,7 @@ func (r requestService) Process(requestId uuid.UUID, clientAccountId uuid.UUID) 
 	var request models.Request
 	result := r.db.Preload("Documents").First(&request, "id = ?", requestId)
 	if result.Error != nil {
+		log.Printf("Error al obtener la solicitud: %v", result.Error)
 		return result.Error
 	}
 	document := request.Documents[0]
