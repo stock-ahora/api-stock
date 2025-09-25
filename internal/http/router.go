@@ -3,6 +3,7 @@ package httpserver
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -47,6 +48,18 @@ func initHealthRoutes(r *chi.Mux, h *handlers.StatusHandler) {
 	})
 }
 
+func initTestGateway(r *chi.Mux, handler handlers.StatusHandler) {
+	r.Get("/test-gateway", func(w http.ResponseWriter, r *http.Request) {
+		if CheckNATGateway() {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("NAT Gateway is working"))
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("NAT Gateway is not working"))
+		}
+	})
+}
+
 func initRequestRoutes(r *chi.Mux, requestService *handlers.RequestHandler) {
 	r.Route(RequestBasePath, func(r chi.Router) {
 		r.Get("/", requestService.List)
@@ -65,4 +78,25 @@ func configListener(connMQ *amqp.Connection, ch *amqp.Channel, requestService re
 	if err := listener.StartListening(); err != nil {
 		log.Fatalf("❌ Error en listener: %v", err)
 	}
+}
+
+func CheckNATGateway() bool {
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Get("https://www.google.com")
+	if err != nil {
+		log.Printf("❌ Error al conectar con Google (NAT Gateway puede estar fallando): %v", err)
+		return false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		log.Printf("✅ NAT Gateway funcionando correctamente, conexión a Google exitosa")
+		return true
+	}
+
+	log.Printf("❌ Error al conectar con Google, código de estado HTTP: %d", resp.StatusCode)
+	return false
 }
