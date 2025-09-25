@@ -39,6 +39,8 @@ func NewRouter(s3Config config.UploadService, db *gorm.DB, connMQ *amqp.Connecti
 
 	initRequestRoutes(r, handleRequest)
 
+	initTestGateway(r, *h)
+
 	return r
 }
 
@@ -60,6 +62,7 @@ func initTestGateway(r *chi.Mux, handler handlers.StatusHandler) {
 	})
 }
 
+// /test-gateway
 func initRequestRoutes(r *chi.Mux, requestService *handlers.RequestHandler) {
 	r.Route(RequestBasePath, func(r chi.Router) {
 		r.Get("/", requestService.List)
