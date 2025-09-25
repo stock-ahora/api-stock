@@ -141,6 +141,8 @@ func (r requestService) Process(requestId uuid.UUID, clientAccountId uuid.UUID) 
 
 	inputModel := textract.TablasToString(*resultTextract)
 
+	log.Printf("Input para Bedrock: %s", inputModel)
+
 	resultBedrock, err := bedrockService.FormatProduct(ctx, inputModel)
 
 	if err != nil {
