@@ -72,15 +72,17 @@ func initRequestRoutes(r *chi.Mux, requestService *handlers.RequestHandler) {
 }
 
 func configListener(connMQ *amqp.Connection, ch *amqp.Channel, requestService request.RequestService) {
-	listener := consumer.NewListener(connMQ, ch, "service.queue", requestService)
+	go func() {
+		listener := consumer.NewListener(connMQ, ch, "service.queue", requestService, 5)
 
-	if err := listener.SetupListener([]string{eventservice.REQUEST_TOPIC, eventservice.MOVEMENT_TOPIC}); err != nil {
-		log.Fatalf("❌ Error en setup listener: %v", err)
-	}
+		if err := listener.SetupListener([]string{eventservice.REQUEST_TOPIC, eventservice.MOVEMENT_TOPIC}); err != nil {
+			log.Fatalf("❌ Error en setup listener: %v", err)
+		}
 
-	if err := listener.StartListening(); err != nil {
-		log.Fatalf("❌ Error en listener: %v", err)
-	}
+		if err := listener.StartListening(); err != nil {
+			log.Fatalf("❌ Error en listener: %v", err)
+		}
+	}()
 }
 
 func CheckNATGateway() bool {

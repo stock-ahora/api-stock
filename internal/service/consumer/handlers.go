@@ -7,18 +7,10 @@ import (
 	"github.com/stock-ahora/api-stock/internal/service/request"
 )
 
-func handleMovement(e eventservice.MovementEvent) {
-	log.Printf("➡️ Procesando MovementEvent: %+v", e)
-
-	// aquí tu lógica de negocio
-}
-
 func handleRequestProcess(e eventservice.RequestProcessEvent, requestService request.RequestService) {
 	log.Printf("📑 Procesando RequestProcessEvent: %+v", e)
 
-	err := requestService.Process(e.RequestID, e.ClientAccountId)
-	if err != nil {
-		return
+	if err := requestService.Process(e.RequestID, e.ClientAccountId); err != nil {
+		log.Printf("❌ error procesando request: %v", err)
 	}
-	// aquí tu lógica de negocio
 }
