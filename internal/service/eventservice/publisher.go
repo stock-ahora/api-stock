@@ -8,7 +8,6 @@ import (
 )
 
 type EventPublisher interface {
-	PublishMovement(e MovementEvent) error
 	PublishDocument(e RequestProcessEvent) error
 }
 
@@ -22,31 +21,6 @@ type MQPublisher struct {
 
 func NewMQPublisher(Channel *amqp.Channel, connection *amqp.Connection) *MQPublisher {
 	return &MQPublisher{Channel: Channel, connection: connection}
-}
-
-func (p *MQPublisher) PublishMovement(e MovementEvent) error {
-	if e.EventID == "" {
-		e.EventID = newUUID()
-	}
-	if e.EventType == "" {
-		e.EventType = "movement"
-	}
-	if e.Version == "" {
-		e.Version = "1"
-	}
-	if e.OccurredAt.IsZero() {
-		e.OccurredAt = time.Now().UTC()
-	}
-
-	rk := MOVEMENT_TOPIC
-
-	headers := amqp.Table{
-		"type":          "movement",
-		"version":       e.Version,
-		"correlationId": e.CorrelationID,
-	}
-
-	return publishJSON(p.Channel, rk, e, headers)
 }
 
 func (p *MQPublisher) PublishRequest(e RequestProcessEvent) error {

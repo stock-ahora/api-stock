@@ -11,7 +11,7 @@ type Product struct {
 	ReferencialID uuid.UUID `gorm:"type:uuid;not null" json:"referencial_id"`
 	Name          string    `gorm:"type:varchar(255);not null" json:"name"`
 	Description   string    `gorm:"type:varchar(255);not null" json:"description"`
-	Stock         int64     `gorm:"not null" json:"stock"`
+	Stock         int       `gorm:"not null" json:"stock"`
 	Status        string    `gorm:"type:varchar(50)" json:"status"`
 	ClientAccount uuid.UUID `gorm:"column:client_account_id;type:uuid;not null" json:"client_account_id"`
 	CreatedAt     time.Time `gorm:"autoCreateTime" json:"created_at"`

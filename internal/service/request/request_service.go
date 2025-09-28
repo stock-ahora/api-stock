@@ -24,7 +24,7 @@ type RequestService interface {
 	Get(uuid uuid.UUID) (models.Request, error)
 	//todo: agregar metodo para confirmar la request y agregar en el open api el metodo igual
 	//todo: agregar metodo para modificar la request
-	Process(requestId uuid.UUID, clientAccountId uuid.UUID) error
+	Process(requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) error
 }
 
 type requestService struct {
@@ -46,7 +46,6 @@ func (r requestService) List() ([]models.Request, error) {
 }
 
 func (r requestService) Create(requestDto *dto.CreateRequestDto) (models.Request, error) {
-	//TODO implement me
 
 	key, err := r.s3Svc.DoHandleUpload(requestDto, "requests/")
 
@@ -57,10 +56,10 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto) (models.Request
 	requestUuid := uuid.New()
 
 	request := models.Request{
-		ID:     requestUuid,
-		Status: models.RequestCreated,
-		//ClientAccountID: requestDto.ClientAccountId,
+		ID:              requestUuid,
+		Status:          models.RequestCreated,
 		ClientAccountID: requestDto.ClientAccountId,
+		MovementTypeId:  requestDto.GetTypeStatus(),
 		CreatedAt:       time.Now(),
 	}
 
@@ -85,7 +84,9 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto) (models.Request
 		return models.Request{}, err
 	}
 
-	err = r.eventSvc.PublishRequest(createdRequestProcess(requestUuid, requestDto.ClientAccountId))
+	var event = createdRequestProcess(requestUuid, requestDto.ClientAccountId, requestDto.GetMovementToUpOrLessStock())
+
+	err = r.eventSvc.PublishRequest(event)
 	if err != nil {
 		return request, err
 	}
@@ -98,14 +99,15 @@ func (r requestService) Get(uuid uuid.UUID) (models.Request, error) {
 	panic("implement me")
 }
 
-func createdRequestProcess(requestId uuid.UUID, clientAccountId uuid.UUID) eventservice.RequestProcessEvent {
+func createdRequestProcess(requestId uuid.UUID, clientAccountId uuid.UUID, movementType int) eventservice.RequestProcessEvent {
 	return eventservice.RequestProcessEvent{
 		RequestID:       requestId,
 		ClientAccountId: clientAccountId,
+		TypeIngress:     movementType,
 	}
 }
 
-func (r requestService) Process(requestId uuid.UUID, clientAccountId uuid.UUID) error {
+func (r requestService) Process(requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) error {
 	log.Printf("Procesando solicitud con ID: %s", requestId)
 
 	var request models.Request
@@ -150,12 +152,12 @@ func (r requestService) Process(requestId uuid.UUID, clientAccountId uuid.UUID) 
 	}
 	log.Printf("Resultado de Bedrock para la solicitud %s: %+v", requestId, resultBedrock)
 
-	updateProduct(*resultBedrock, r.db, 1, clientAccountId)
+	updateProduct(*resultBedrock, r.db, typeIngress, clientAccountId)
 
 	return nil
 }
 
-func updateProduct(productsFind []bedrock.ProductResponse, db *gorm.DB, typeIngress int64, clientAccountId uuid.UUID) {
+func updateProduct(productsFind []bedrock.ProductResponse, db *gorm.DB, typeIngress int, clientAccountId uuid.UUID) {
 
 	for _, product := range productsFind {
 

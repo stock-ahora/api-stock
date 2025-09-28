@@ -12,6 +12,7 @@ type Request struct {
 	Status          RequestStatus `gorm:"type:varchar(50)"`
 	CreatedAt       time.Time     `gorm:"column:create_at;autoCreateTime"`
 	UpdatedAt       time.Time     `gorm:"column:updated_at;autoUpdateTime"`
+	MovementTypeId  int           `gorm:"column:movement_type_id;type:int;default:null"`
 	Documents       []Documents   `gorm:"foreignKey:RequestID"`
 }
 

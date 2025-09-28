@@ -14,7 +14,7 @@ import (
 
 type ProductResponse struct {
 	Name  string   `json:"name"`
-	Count int64    `json:"count"`
+	Count int      `json:"count"`
 	SKUs  []string `json:"skus"`
 }
 

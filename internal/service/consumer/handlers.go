@@ -10,7 +10,7 @@ import (
 func handleRequestProcess(e eventservice.RequestProcessEvent, requestService request.RequestService) {
 	log.Printf("📑 Procesando RequestProcessEvent: %+v", e)
 
-	if err := requestService.Process(e.RequestID, e.ClientAccountId); err != nil {
+	if err := requestService.Process(e.RequestID, e.ClientAccountId, e.TypeIngress); err != nil {
 		log.Printf("❌ error procesando request: %v", err)
 	}
 }
