@@ -75,7 +75,7 @@ func configListener(connMQ *amqp.Connection, ch *amqp.Channel, requestService re
 	go func() {
 		listener := consumer.NewListener(connMQ, ch, "service.queue", requestService, 5)
 
-		if err := listener.SetupListener([]string{eventservice.REQUEST_TOPIC, eventservice.MOVEMENT_TOPIC}); err != nil {
+		if err := listener.SetupListener([]string{eventservice.RequestTopic, eventservice.MovementTopic}); err != nil {
 			log.Fatalf("❌ Error en setup listener: %v", err)
 		}
 

@@ -52,3 +52,8 @@ func (s CreateRequestDto) GetMovementToUpOrLessStock() int {
 		return 1
 	}
 }
+
+var TypeMovement = map[int]int{
+	-1: 2,
+	1:  1,
+}

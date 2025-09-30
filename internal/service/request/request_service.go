@@ -152,12 +152,14 @@ func (r requestService) Process(requestId uuid.UUID, clientAccountId uuid.UUID, 
 	}
 	log.Printf("Resultado de Bedrock para la solicitud %s: %+v", requestId, resultBedrock)
 
-	updateProduct(*resultBedrock, r.db, typeIngress, clientAccountId)
+	r.updateProduct(*resultBedrock, r.db, typeIngress, clientAccountId, requestId)
 
 	return nil
 }
 
-func updateProduct(productsFind []bedrock.ProductResponse, db *gorm.DB, typeIngress int, clientAccountId uuid.UUID) {
+func (r requestService) updateProduct(productsFind []bedrock.ProductResponse, db *gorm.DB, typeIngress int, clientAccountId uuid.UUID, requestId uuid.UUID) {
+
+	listMovement := make([]eventservice.ProductPerMovement, 0, len(productsFind))
 
 	for _, product := range productsFind {
 
@@ -197,14 +199,38 @@ func updateProduct(productsFind []bedrock.ProductResponse, db *gorm.DB, typeIngr
 			db.Create(&requestSku)
 		}
 
+		listMovement = append(listMovement, createMovement(productUpdate, product.Count, typeIngress))
 	}
-	eventMovement()
+
+	movementsRequest := eventservice.MovementsEvent{
+		Id:                 uuid.New(),
+		ProductPerMovement: listMovement,
+		RequestId:          requestId,
+	}
+
+	r.eventMovement(movementsRequest)
 	notificationMovement()
 
 }
 
-func eventMovement() {
-	//TODO implement me
+func createMovement(product models.Product, count int, typeMovement int) eventservice.ProductPerMovement {
+
+	return eventservice.ProductPerMovement{
+		ProductID:      product.ID,
+		Count:          count,
+		MovementId:     uuid.New(),
+		MovementTypeId: dto.TypeMovement[typeMovement],
+		CreatedAt:      time.Now(),
+	}
+}
+
+func (r requestService) eventMovement(movements eventservice.MovementsEvent) {
+
+	err := r.eventSvc.PublishMovements(movements)
+	if err != nil {
+		log.Printf("Error al publicar el evento de movimientos: %v", err)
+	}
+
 }
 
 func notificationMovement() {
