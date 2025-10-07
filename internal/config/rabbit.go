@@ -9,7 +9,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func NewRabbitMq(mq MQConfig) (*amqp.Connection, *amqp.Channel) {
+func NewRabbitMq(mq MQConfig) (*amqp.Connection, *amqp.Channel, string) {
 
 	rootCAs, _ := x509.SystemCertPool()
 
@@ -26,6 +26,6 @@ func NewRabbitMq(mq MQConfig) (*amqp.Connection, *amqp.Channel) {
 	if err != nil {
 		log.Fatalf("❌ Error creando canal: %v", err)
 	}
-	return conn, ch
+	return conn, ch, url
 
 }

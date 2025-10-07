@@ -7,7 +7,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func publishJSON(ch *amqp.Channel, routingKey string, msg interface{}, headers amqp.Table) error {
+func (p *MQPublisher) publishJSON(routingKey string, msg interface{}, headers amqp.Table) error {
 	body, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -21,7 +21,20 @@ func publishJSON(ch *amqp.Channel, routingKey string, msg interface{}, headers a
 		Body:         body,
 	}
 
-	return ch.Publish(
+	if p.connection.IsClosed() {
+		newConn, err := amqp.Dial(p.urlConnection)
+		if err != nil {
+			return err
+		}
+		newCh, err := newConn.Channel()
+		if err != nil {
+			return err
+		}
+		p.connection = newConn
+		p.Channel = newCh
+	}
+
+	return p.Channel.Publish(
 		ExchangeName,
 		routingKey,
 		false, // mandatory

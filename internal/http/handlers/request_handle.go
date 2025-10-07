@@ -67,7 +67,12 @@ func (h *RequestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	json.NewEncoder(w).Encode(req)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	err = json.NewEncoder(w).Encode(req)
+	if err != nil {
+		return
+	}
 }
 
 func (h *RequestHandler) Get(w http.ResponseWriter, r *http.Request) {

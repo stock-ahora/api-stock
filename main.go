@@ -30,9 +30,9 @@ func main() {
 
 	log.Printf("S3 Configured: Bucket %s ", s3.Bucket)
 
-	connMQ, ch := mqConfig(cfg)
+	connMQ, ch, urlConnectionMQ := mqConfig(cfg)
 
-	r := httpserver.NewRouter(*s3, db, connMQ, ch, cfg.S3Region)
+	r := httpserver.NewRouter(*s3, db, connMQ, ch, cfg.S3Region, urlConnectionMQ)
 
 	addr := ":8082"
 	log.Printf("API listening on %s", addr)
@@ -42,13 +42,13 @@ func main() {
 
 }
 
-func mqConfig(cfg *config.SecretApp) (*amqp.Connection, *amqp.Channel) {
-	connMQ, ch := config.NewRabbitMq(cfg.ToMQConfig())
+func mqConfig(cfg *config.SecretApp) (*amqp.Connection, *amqp.Channel, string) {
+	connMQ, ch, urlConnectionMQ := config.NewRabbitMq(cfg.ToMQConfig())
 
 	if err := eventservice.EnsureTopology(ch); err != nil {
 		log.Fatalf("❌ Error creando topología: %v", err)
 	}
-	return connMQ, ch
+	return connMQ, ch, urlConnectionMQ
 }
 
 func getDbConfig(cfg *config.SecretApp) *gorm.DB {

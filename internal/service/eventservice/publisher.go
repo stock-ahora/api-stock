@@ -15,12 +15,13 @@ const MovementTopic = "movement.generated"
 const RequestTopic = "Request.process"
 
 type MQPublisher struct {
-	Channel    *amqp.Channel
-	connection *amqp.Connection
+	Channel       *amqp.Channel
+	connection    *amqp.Connection
+	urlConnection string
 }
 
-func NewMQPublisher(Channel *amqp.Channel, connection *amqp.Connection) *MQPublisher {
-	return &MQPublisher{Channel: Channel, connection: connection}
+func NewMQPublisher(Channel *amqp.Channel, connection *amqp.Connection, urlConnection string) *MQPublisher {
+	return &MQPublisher{Channel: Channel, connection: connection, urlConnection: urlConnection}
 }
 
 func (p *MQPublisher) PublishRequest(e RequestProcessEvent) error {
@@ -45,7 +46,7 @@ func (p *MQPublisher) PublishRequest(e RequestProcessEvent) error {
 		"correlationId": e.CorrelationID,
 	}
 
-	return publishJSON(p.Channel, rk, e, headers)
+	return p.publishJSON(rk, e, headers)
 }
 
 func (p *MQPublisher) PublishMovements(e MovementsEvent) error {
@@ -70,7 +71,7 @@ func (p *MQPublisher) PublishMovements(e MovementsEvent) error {
 		"correlationId": e.CorrelationID,
 	}
 
-	return publishJSON(p.Channel, rk, e, headers)
+	return p.publishJSON(rk, e, headers)
 }
 
 func newUUID() string {

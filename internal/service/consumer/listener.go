@@ -6,6 +6,7 @@ import (
 	"log"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/stock-ahora/api-stock/internal/service/eventservice"
 	"github.com/stock-ahora/api-stock/internal/service/request"
@@ -18,9 +19,10 @@ type Listener struct {
 	queueName      string
 	requestService request.RequestService
 	workerCount    int
+	urlConnection  string
 }
 
-func NewListener(conn *amqp.Connection, ch *amqp.Channel, queue string, requestService request.RequestService, workers int) *Listener {
+func NewListener(conn *amqp.Connection, ch *amqp.Channel, queue string, requestService request.RequestService, workers int, urlConnection string) *Listener {
 	if workers <= 0 {
 		workers = runtime.NumCPU() // por defecto usa el número de CPUs
 	}
@@ -30,11 +32,11 @@ func NewListener(conn *amqp.Connection, ch *amqp.Channel, queue string, requestS
 		queueName:      queue,
 		requestService: requestService,
 		workerCount:    workers,
+		urlConnection:  urlConnection,
 	}
 }
 
 func (l *Listener) SetupListener(routingKeys []string) error {
-	// Declarar cola durable
 	q, err := l.channel.QueueDeclare(
 		l.queueName,
 		true,
@@ -117,4 +119,46 @@ func (l *Listener) handleMessage(d amqp.Delivery) error {
 		log.Printf("⚠️ No hay handler para routing key: %s", d.RoutingKey)
 	}
 	return nil
+}
+
+func (l *Listener) reconnectLoop() {
+	connErrCh := l.connection.NotifyClose(make(chan *amqp.Error))
+	chanErrCh := l.channel.NotifyClose(make(chan *amqp.Error))
+
+	go func() {
+		for {
+			select {
+			case err, ok := <-connErrCh:
+				if !ok {
+					log.Println("⚠️ conexión cerrada sin error explícito")
+					return
+				}
+				log.Printf("❌ conexión cerrada: %v", err)
+				l.reconnect()
+
+			case err, ok := <-chanErrCh:
+				if !ok {
+					log.Println("⚠️ canal cerrado sin error explícito")
+					return
+				}
+				log.Printf("❌ canal cerrado: %v", err)
+				l.reconnect()
+			}
+		}
+	}()
+}
+
+func (l *Listener) reconnect() {
+	for {
+		time.Sleep(5 * time.Second) // backoff
+		if err := l.SetupListener([]string{eventservice.RequestTopic}); err == nil {
+			log.Println("🔄 Reconexión exitosa, reiniciando consumo...")
+			if err := l.StartListening(); err != nil {
+				log.Printf("❌ error al reiniciar consumo: %v", err)
+				continue
+			}
+			break
+		}
+		log.Println("⏳ Reintentando conexión...")
+	}
 }

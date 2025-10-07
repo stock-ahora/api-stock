@@ -24,17 +24,17 @@ const S3BasePath = APIBasePath + "/s3"
 const RequestBasePath = APIBasePath + "/request"
 const HealthPath = "/api/v1" + "/health"
 
-func NewRouter(s3Config config.UploadService, db *gorm.DB, connMQ *amqp.Connection, channel *amqp.Channel, region string) *chi.Mux {
+func NewRouter(s3Config config.UploadService, db *gorm.DB, connMQ *amqp.Connection, channel *amqp.Channel, region string, urlConnectionMQ string) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID, middleware.Logger, middleware.Recoverer)
 	h := handlers.NewStatusHandler()
 	s3Svc := s3.NewS3Svs(s3.S3config{UploadService: s3Config})
-	eventService := eventservice.NewMQPublisher(channel, connMQ)
+	eventService := eventservice.NewMQPublisher(channel, connMQ, urlConnectionMQ)
 	textractService := textract.NewTextractService(region)
 	requestService := request.NewRequestService(db, s3Svc, eventService, textractService)
 	handleRequest := &handlers.RequestHandler{Service: requestService}
 
-	configListener(connMQ, channel, requestService)
+	configListener(connMQ, channel, requestService, urlConnectionMQ)
 	initHealthRoutes(r, h)
 
 	initRequestRoutes(r, handleRequest)
@@ -71,11 +71,11 @@ func initRequestRoutes(r *chi.Mux, requestService *handlers.RequestHandler) {
 	})
 }
 
-func configListener(connMQ *amqp.Connection, ch *amqp.Channel, requestService request.RequestService) {
+func configListener(connMQ *amqp.Connection, ch *amqp.Channel, requestService request.RequestService, urlConnectionMQ string) {
 	go func() {
-		listener := consumer.NewListener(connMQ, ch, "service.queue", requestService, 5)
+		listener := consumer.NewListener(connMQ, ch, "service.queue", requestService, 5, urlConnectionMQ)
 
-		if err := listener.SetupListener([]string{eventservice.RequestTopic, eventservice.MovementTopic}); err != nil {
+		if err := listener.SetupListener([]string{eventservice.RequestTopic}); err != nil {
 			log.Fatalf("❌ Error en setup listener: %v", err)
 		}
 
