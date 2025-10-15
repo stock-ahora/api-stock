@@ -12,5 +12,6 @@ func handleRequestProcess(e eventservice.RequestProcessEvent, requestService req
 
 	if err := requestService.Process(e.RequestID, e.ClientAccountId, e.TypeIngress); err != nil {
 		log.Printf("❌ error procesando request: %v", err)
+		return
 	}
 }

@@ -2,6 +2,7 @@ package eventservice
 
 import (
 	"encoding/json"
+	"log"
 	"time"
 
 	"github.com/streadway/amqp"
@@ -12,6 +13,8 @@ func (p *MQPublisher) publishJSON(routingKey string, msg interface{}, headers am
 	if err != nil {
 		return err
 	}
+
+	log.Println("Publishing JSON:", routingKey, body)
 
 	pub := amqp.Publishing{
 		ContentType:  "application/json",

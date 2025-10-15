@@ -216,6 +216,7 @@ func (r requestService) updateProduct(productsFind []bedrock.ProductResponse, db
 func createMovement(product models.Product, count int, typeMovement int) eventservice.ProductPerMovement {
 
 	return eventservice.ProductPerMovement{
+		Id:             uuid.New().String(),
 		ProductID:      product.ID,
 		Count:          count,
 		MovementId:     uuid.New(),

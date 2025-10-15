@@ -24,6 +24,7 @@ type MovementsEvent struct {
 }
 
 type ProductPerMovement struct {
+	Id             string    `json:"id"`
 	ProductID      uuid.UUID `json:"product_id"`
 	Count          int       `json:"count"`
 	MovementId     uuid.UUID `json:"movement_id"`

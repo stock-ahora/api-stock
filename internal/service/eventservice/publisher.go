@@ -1,6 +1,7 @@
 package eventservice
 
 import (
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -46,6 +47,8 @@ func (p *MQPublisher) PublishRequest(e RequestProcessEvent) error {
 		"correlationId": e.CorrelationID,
 	}
 
+	log.Println("Publishing request event:", e)
+
 	return p.publishJSON(rk, e, headers)
 }
 
@@ -70,6 +73,8 @@ func (p *MQPublisher) PublishMovements(e MovementsEvent) error {
 		"version":       e.Version,
 		"correlationId": e.CorrelationID,
 	}
+
+	log.Println("Publishing movement event:", e)
 
 	return p.publishJSON(rk, e, headers)
 }
