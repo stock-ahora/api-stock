@@ -12,7 +12,7 @@ import (
 func NewS3Client(region, bucket string) (*s3.Client, *manager.Uploader, string, error) {
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(region))
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("no se pudo cargar config AWS: %w", err)
+		return nil, nil, "", fmt.Errorf("no see pudo cargar config AWS: %w", err)
 	}
 
 	s3Client := s3.NewFromConfig(cfg)
