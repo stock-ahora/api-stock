@@ -19,7 +19,7 @@ type SecretApp struct {
 	MQ_HOST     string `json:"MQ_HOST"`
 	MQ_PASSWORD string `json:"MQ_PASSWORD"`
 	MQ_PORT     int    `json:"MQ_PORT"`
-	MQ_USER     string `json:"MQ_USER"`
+	MQ_USER     string `json:"MQ_USER_STOCK"`
 	MQ_VHOST    string `json:"MQ_VHOST"`
 }
 
