@@ -121,7 +121,7 @@ func (l *Listener) handleMessage(d amqp.Delivery) error {
 	return nil
 }
 
-func (l *Listener) reconnectLoop() {
+func (l *Listener) ReconnectLoop() {
 	connErrCh := l.connection.NotifyClose(make(chan *amqp.Error))
 	chanErrCh := l.channel.NotifyClose(make(chan *amqp.Error))
 

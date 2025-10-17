@@ -1,6 +1,8 @@
 package eventservice
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"log"
 	"time"
@@ -25,16 +27,28 @@ func (p *MQPublisher) publishJSON(routingKey string, msg interface{}, headers am
 	}
 
 	if p.connection.IsClosed() {
-		newConn, err := amqp.Dial(p.urlConnection)
+		rootCAs, _ := x509.SystemCertPool()
+		tlsCfg := &tls.Config{RootCAs: rootCAs}
+
+		newConn, err := amqp.DialTLS(p.urlConnection, tlsCfg)
 		if err != nil {
 			return err
 		}
+		defer func() {
+			if newConn != nil {
+				newConn.Close()
+			}
+		}()
+
 		newCh, err := newConn.Channel()
 		if err != nil {
 			return err
 		}
+
+		// asignar y evitar que el defer cierre la conexión
 		p.connection = newConn
 		p.Channel = newCh
+		newConn = nil
 	}
 
 	return p.Channel.Publish(

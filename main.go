@@ -32,7 +32,7 @@ func main() {
 
 	connMQ, ch, urlConnectionMQ := mqConfig(cfg)
 
-	r := httpserver.NewRouter(*s3, db, connMQ, ch, cfg.S3Region, urlConnectionMQ)
+	r := httpserver.NewRouter(*s3, db, connMQ, ch, cfg.S3Region, urlConnectionMQ, cfg.ToMQConfig())
 
 	addr := ":8082"
 	log.Printf("API listening on %s", addr)

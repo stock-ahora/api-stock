@@ -24,7 +24,7 @@ const S3BasePath = APIBasePath + "/s3"
 const RequestBasePath = APIBasePath + "/request"
 const HealthPath = "/api/v1" + "/health"
 
-func NewRouter(s3Config config.UploadService, db *gorm.DB, connMQ *amqp.Connection, channel *amqp.Channel, region string, urlConnectionMQ string) *chi.Mux {
+func NewRouter(s3Config config.UploadService, db *gorm.DB, connMQ *amqp.Connection, channel *amqp.Channel, region string, urlConnectionMQ string, mqConfig config.MQConfig) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID, middleware.Logger, middleware.Recoverer)
 	h := handlers.NewStatusHandler()
@@ -34,7 +34,7 @@ func NewRouter(s3Config config.UploadService, db *gorm.DB, connMQ *amqp.Connecti
 	requestService := request.NewRequestService(db, s3Svc, eventService, textractService)
 	handleRequest := &handlers.RequestHandler{Service: requestService}
 
-	configListener(connMQ, channel, requestService, urlConnectionMQ)
+	configListener(connMQ, channel, requestService, urlConnectionMQ, mqConfig)
 	initHealthRoutes(r, h)
 
 	initRequestRoutes(r, handleRequest)
@@ -71,13 +71,23 @@ func initRequestRoutes(r *chi.Mux, requestService *handlers.RequestHandler) {
 	})
 }
 
-func configListener(connMQ *amqp.Connection, ch *amqp.Channel, requestService request.RequestService, urlConnectionMQ string) {
+func configListener(_ *amqp.Connection, _ *amqp.Channel, requestService request.RequestService, urlConnectionMQ string, mqConfig config.MQConfig) {
 	go func() {
-		listener := consumer.NewListener(connMQ, ch, "service.queue", requestService, 5, urlConnectionMQ)
+		subConn, subCh, _ := config.NewRabbitMq(mqConfig)
+
+		// (idempotente) declara topología en el canal del consumidor
+		if err := eventservice.EnsureTopology(subCh); err != nil {
+			log.Fatalf("❌ Error declarando topología (consumer): %v", err)
+		}
+
+		listener := consumer.NewListener(subConn, subCh, "service.queue", requestService, 5, urlConnectionMQ)
 
 		if err := listener.SetupListener([]string{eventservice.RequestTopic}); err != nil {
 			log.Fatalf("❌ Error en setup listener: %v", err)
 		}
+
+		// 🔁 Activa el loop de reconexión
+		listener.ReconnectLoop()
 
 		if err := listener.StartListening(); err != nil {
 			log.Fatalf("❌ Error en listener: %v", err)
