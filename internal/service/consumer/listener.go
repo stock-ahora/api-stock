@@ -93,7 +93,7 @@ func (l *Listener) StartListening() error {
 				log.Printf("📥 [Worker %d] Recibido mensaje con routing key: %s", id, d.RoutingKey)
 				if err := l.handleMessage(d); err != nil {
 					log.Printf("❌ error procesando mensaje: %v", err)
-					_ = d.Nack(false, false) // requeue = true
+					_ = d.Nack(false, true) // requeue = true
 					continue
 				}
 				_ = d.Ack(false)

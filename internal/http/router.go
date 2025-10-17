@@ -26,7 +26,7 @@ const HealthPath = "/api/v1" + "/health"
 
 func NewRouter(s3Config config.UploadService, db *gorm.DB, connMQ *amqp.Connection, channel *amqp.Channel, region string, urlConnectionMQ string, mqConfig config.MQConfig) *chi.Mux {
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID, middleware.Logger, middleware.Recoverer)
+	r.Use(middleware.RequestID, middleware.Recoverer)
 	h := handlers.NewStatusHandler()
 	s3Svc := s3.NewS3Svs(s3.S3config{UploadService: s3Config})
 	eventService := eventservice.NewMQPublisher(channel, connMQ, urlConnectionMQ)
