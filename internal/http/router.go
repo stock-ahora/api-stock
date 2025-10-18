@@ -112,6 +112,13 @@ func configListener(requestService request.RequestService, mqCfg config.MQConfig
 		const routingKey = eventservice.RequestTopic
 		const exchange = eventservice.ExchangeName
 
+		args := rabbitmq.WithConsumerOptionsQueueArgs(map[string]interface{}{
+			"x-dead-letter-exchange":    "events.failover",
+			"x-dead-letter-routing-key": "Request.process.failover",
+			// Si prefieres TTL por cola:
+			// "x-message-ttl": 2000,
+		})
+
 		consumerClient, err := rabbitmq.NewConsumer(
 			conn,
 			queueName,
@@ -123,6 +130,7 @@ func configListener(requestService request.RequestService, mqCfg config.MQConfig
 			rabbitmq.WithConsumerOptionsRoutingKey(routingKey),
 			rabbitmq.WithConsumerOptionsQOSPrefetch(5),
 			rabbitmq.WithConsumerOptionsConcurrency(5),
+			args,
 			rabbitmq.WithConsumerOptionsConsumerName("api-stock-consumer"),
 		)
 		if err != nil {

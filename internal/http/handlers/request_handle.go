@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stock-ahora/api-stock/internal/dto"
@@ -62,9 +64,12 @@ func (h *RequestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ClientAccountId: clientAccountID,
 	}
 
-	req, err := h.Service.Create(requestDto)
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
+	req, err := h.Service.Create(requestDto, ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "messaging busy", http.StatusServiceUnavailable)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

@@ -29,7 +29,7 @@ func RabbitConn(mq MQConfig) (*rabbitmq.Conn, string, error) {
 		url,
 		rabbitmq.WithConnectionOptionsConfig(rabbitmq.Config{
 			TLSClientConfig: tlsConfig(),
-			Heartbeat:       10 * time.Second,
+			Heartbeat:       2 * time.Second,
 			Locale:          "en_US",
 			Dial:            amqp.DefaultDial(30 * time.Second),
 		}),

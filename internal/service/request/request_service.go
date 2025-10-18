@@ -20,7 +20,7 @@ import (
 
 type RequestService interface {
 	List() ([]models.Request, error)
-	Create(*dto.CreateRequestDto) (models.Request, error)
+	Create(*dto.CreateRequestDto, context.Context) (models.Request, error)
 	Get(uuid uuid.UUID) (models.Request, error)
 	//todo: agregar metodo para confirmar la request y agregar en el open api el metodo igual
 	//todo: agregar metodo para modificar la request
@@ -55,7 +55,7 @@ func (r requestService) List() ([]models.Request, error) {
 	panic("implement me")
 }
 
-func (r requestService) Create(requestDto *dto.CreateRequestDto) (models.Request, error) {
+func (r requestService) Create(requestDto *dto.CreateRequestDto, ctx context.Context) (models.Request, error) {
 
 	key, err := r.s3Svc.DoHandleUpload(requestDto, "requests/")
 
@@ -96,7 +96,7 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto) (models.Request
 
 	var event = createdRequestProcess(requestUuid, requestDto.ClientAccountId, requestDto.GetMovementToUpOrLessStock())
 
-	err = r.eventSvc.PublishRequest(event)
+	err = r.eventSvc.PublishRequest(event, ctx)
 	if err != nil {
 		return request, err
 	}
