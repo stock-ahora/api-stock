@@ -116,7 +116,7 @@ func configListener(requestService request.RequestService, mqCfg config.MQConfig
 			"x-dead-letter-exchange":    "events.failover",
 			"x-dead-letter-routing-key": "Request.process.failover",
 			// Si prefieres TTL por cola:
-			// "x-message-ttl": 2000,
+			"x-message-ttl": 2000,
 		})
 
 		consumerClient, err := rabbitmq.NewConsumer(
