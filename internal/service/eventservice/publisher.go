@@ -14,7 +14,7 @@ type EventPublisher interface {
 }
 
 const MovementTopic = "movement.generated"
-const RequestTopic = "Request.process"
+const RequestTopic = "Request.process.prod"
 
 type MQPublisher struct {
 	pub           *rabbitmq.Publisher
