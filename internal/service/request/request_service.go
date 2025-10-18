@@ -25,6 +25,7 @@ type RequestService interface {
 	//todo: agregar metodo para confirmar la request y agregar en el open api el metodo igual
 	//todo: agregar metodo para modificar la request
 	Process(requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) error
+	ProcessCtx(ctx context.Context, requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) interface{}
 }
 
 type requestService struct {
@@ -32,6 +33,15 @@ type requestService struct {
 	s3Svc    *s3.S3Svc
 	eventSvc *eventservice.MQPublisher
 	textract *textract.TextractService
+}
+
+func (r requestService) ProcessCtx(ctx context.Context, requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) interface{} {
+
+	err := r.Process(requestId, clientAccountId, typeIngress)
+	if err != nil {
+		return nil
+	}
+	return nil
 }
 
 func NewRequestService(db *gorm.DB, s3Svc *s3.S3Svc, eventSvc *eventservice.MQPublisher, textract *textract.TextractService) RequestService {

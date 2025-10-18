@@ -1,9 +1,11 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -129,22 +131,35 @@ func configListener(requestService request.RequestService, mqCfg config.MQConfig
 
 		// Run(handler) SIN opciones
 		err = consumerClient.Run(func(d rabbitmq.Delivery) rabbitmq.Action {
-			switch d.RoutingKey {
-			case routingKey:
-				var evt eventservice.RequestProcessEvent
-				if err := json.Unmarshal(d.Body, &evt); err != nil {
-					log.Printf("❌ parseando RequestProcessEvent: %v", err)
-					return rabbitmq.NackRequeue
+			// 1) anti-panic (no mates el worker)
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("panic in consumer: %v\n%s", r, debug.Stack())
 				}
-				if err := requestService.Process(evt.RequestID, evt.ClientAccountId, evt.TypeIngress); err != nil {
-					log.Printf("❌ error procesando request: %v", err)
-					return rabbitmq.NackRequeue
-				}
-				return rabbitmq.Ack
-			default:
-				log.Printf("⚠️ No hay handler para routing key: %s", d.RoutingKey)
-				return rabbitmq.Ack
+			}()
+
+			// 2) parsear el evento ANTES de usar evt.*
+			var evt eventservice.RequestProcessEvent
+			if err := json.Unmarshal(d.Body, &evt); err != nil {
+				log.Printf("❌ payload inválido: %v", err)
+				// si el mensaje está mal formado, no conviene reencolarlo
+				return rabbitmq.NackDiscard
 			}
+
+			// 3) timeout para el trabajo de negocio
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			start := time.Now()
+			if err := requestService.ProcessCtx(ctx, evt.RequestID, evt.ClientAccountId, evt.TypeIngress); err != nil {
+				log.Printf("❌ handler err: %v (elapsed %s)", err, time.Since(start))
+				// si el error es transitorio (DB down, timeouts), reencola:
+				return rabbitmq.NackRequeue
+				// si detectas error permanente, usa: return rabbitmq.NackDiscard
+			}
+
+			log.Printf("✅ ok rk=%s elapsed=%s", d.RoutingKey, time.Since(start))
+			return rabbitmq.Ack
 		})
 		if err != nil {
 			log.Fatalf("❌ Error en consumer.Run: %v", err)
