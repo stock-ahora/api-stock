@@ -5,24 +5,24 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/streadway/amqp"
+	"github.com/wagslane/go-rabbitmq"
 )
 
 type EventPublisher interface {
-	PublishDocument(e RequestProcessEvent) error
+	PublishRequest(e RequestProcessEvent) error
+	PublishMovements(e MovementsEvent) error
 }
 
 const MovementTopic = "movement.generated"
 const RequestTopic = "Request.process"
 
 type MQPublisher struct {
-	Channel       *amqp.Channel
-	connection    *amqp.Connection
+	pub           *rabbitmq.Publisher
 	urlConnection string
 }
 
-func NewMQPublisher(Channel *amqp.Channel, connection *amqp.Connection, urlConnection string) *MQPublisher {
-	return &MQPublisher{Channel: Channel, connection: connection, urlConnection: urlConnection}
+func NewMQPublisher(pub *rabbitmq.Publisher, urlConnection string) *MQPublisher {
+	return &MQPublisher{pub: pub, urlConnection: urlConnection}
 }
 
 func (p *MQPublisher) PublishRequest(e RequestProcessEvent) error {
@@ -39,17 +39,12 @@ func (p *MQPublisher) PublishRequest(e RequestProcessEvent) error {
 		e.OccurredAt = time.Now().UTC()
 	}
 
-	rk := RequestTopic
-
-	headers := amqp.Table{
+	log.Println("Publishing request event:", e)
+	return p.publishJSON(RequestTopic, e, map[string]any{
 		"type":          "document",
 		"version":       e.Version,
 		"correlationId": e.CorrelationID,
-	}
-
-	log.Println("Publishing request event:", e)
-
-	return p.publishJSON(rk, e, headers)
+	})
 }
 
 func (p *MQPublisher) PublishMovements(e MovementsEvent) error {
@@ -66,20 +61,12 @@ func (p *MQPublisher) PublishMovements(e MovementsEvent) error {
 		e.OccurredAt = time.Now().UTC()
 	}
 
-	rk := MovementTopic
-
-	headers := amqp.Table{
+	log.Println("Publishing movement event:", e)
+	return p.publishJSON(MovementTopic, e, map[string]any{
 		"type":          "document",
 		"version":       e.Version,
 		"correlationId": e.CorrelationID,
-	}
-
-	log.Println("Publishing movement event:", e)
-
-	return p.publishJSON(rk, e, headers)
+	})
 }
 
-func newUUID() string {
-
-	return uuid.New().String()
-}
+func newUUID() string { return uuid.New().String() }

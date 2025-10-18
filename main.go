@@ -7,8 +7,6 @@ import (
 
 	"github.com/stock-ahora/api-stock/internal/config"
 	"github.com/stock-ahora/api-stock/internal/http"
-	"github.com/stock-ahora/api-stock/internal/service/eventservice"
-	"github.com/streadway/amqp"
 	"gorm.io/gorm"
 )
 
@@ -30,9 +28,7 @@ func main() {
 
 	log.Printf("S3 Configured: Bucket %s ", s3.Bucket)
 
-	connMQ, ch, urlConnectionMQ := mqConfig(cfg)
-
-	r := httpserver.NewRouter(*s3, db, connMQ, ch, cfg.S3Region, urlConnectionMQ, cfg.ToMQConfig())
+	r := httpserver.NewRouter(*s3, db, nil, nil, cfg.S3Region, "", cfg.ToMQConfig())
 
 	addr := ":8082"
 	log.Printf("API listening on %s", addr)
@@ -40,15 +36,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-}
-
-func mqConfig(cfg *config.SecretApp) (*amqp.Connection, *amqp.Channel, string) {
-	connMQ, ch, urlConnectionMQ := config.NewRabbitMq(cfg.ToMQConfig())
-
-	if err := eventservice.EnsureTopology(ch); err != nil {
-		log.Fatalf("❌ Error creando topología: %v", err)
-	}
-	return connMQ, ch, urlConnectionMQ
 }
 
 func getDbConfig(cfg *config.SecretApp) *gorm.DB {

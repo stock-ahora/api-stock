@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -8,12 +9,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stock-ahora/api-stock/internal/config"
-	"github.com/stock-ahora/api-stock/internal/service/consumer"
 	"github.com/stock-ahora/api-stock/internal/service/eventservice"
 	"github.com/stock-ahora/api-stock/internal/service/request"
 	"github.com/stock-ahora/api-stock/internal/service/s3"
 	"github.com/stock-ahora/api-stock/internal/service/textract"
-	"github.com/streadway/amqp"
+	"github.com/wagslane/go-rabbitmq"
 	"gorm.io/gorm"
 
 	"github.com/stock-ahora/api-stock/internal/http/handlers"
@@ -24,17 +24,23 @@ const S3BasePath = APIBasePath + "/s3"
 const RequestBasePath = APIBasePath + "/request"
 const HealthPath = "/api/v1" + "/health"
 
-func NewRouter(s3Config config.UploadService, db *gorm.DB, connMQ *amqp.Connection, channel *amqp.Channel, region string, urlConnectionMQ string, mqConfig config.MQConfig) *chi.Mux {
+func NewRouter(s3Config config.UploadService, db *gorm.DB, _ any, _ any, region string, _ string, mqConfig config.MQConfig) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID, middleware.Recoverer)
 	h := handlers.NewStatusHandler()
 	s3Svc := s3.NewS3Svs(s3.S3config{UploadService: s3Config})
-	eventService := eventservice.NewMQPublisher(channel, connMQ, urlConnectionMQ)
+
+	pub, urlConnectionMQ, err := config.RabbitPublisher(mqConfig)
+	if err != nil {
+		log.Fatalf("❌ Publisher MQ: %v", err)
+	}
+	eventService := eventservice.NewMQPublisher(pub, urlConnectionMQ)
+
 	textractService := textract.NewTextractService(region)
 	requestService := request.NewRequestService(db, s3Svc, eventService, textractService)
 	handleRequest := &handlers.RequestHandler{Service: requestService}
 
-	configListener(connMQ, channel, requestService, urlConnectionMQ, mqConfig)
+	configListener(requestService, mqConfig)
 	initHealthRoutes(r, h)
 
 	initRequestRoutes(r, handleRequest)
@@ -71,30 +77,6 @@ func initRequestRoutes(r *chi.Mux, requestService *handlers.RequestHandler) {
 	})
 }
 
-func configListener(_ *amqp.Connection, _ *amqp.Channel, requestService request.RequestService, urlConnectionMQ string, mqConfig config.MQConfig) {
-	go func() {
-		subConn, subCh, _ := config.NewRabbitMq(mqConfig)
-
-		// (idempotente) declara topología en el canal del consumidor
-		if err := eventservice.EnsureTopology(subCh); err != nil {
-			log.Fatalf("❌ Error declarando topología (consumer): %v", err)
-		}
-
-		listener := consumer.NewListener(subConn, subCh, "service.queue", requestService, 5, urlConnectionMQ)
-
-		if err := listener.SetupListener([]string{eventservice.RequestTopic}); err != nil {
-			log.Fatalf("❌ Error en setup listener: %v", err)
-		}
-
-		// 🔁 Activa el loop de reconexión
-		listener.ReconnectLoop()
-
-		if err := listener.StartListening(); err != nil {
-			log.Fatalf("❌ Error en listener: %v", err)
-		}
-	}()
-}
-
 func CheckNATGateway() bool {
 	client := http.Client{
 		Timeout: 5 * time.Second,
@@ -114,4 +96,58 @@ func CheckNATGateway() bool {
 
 	log.Printf("❌ Error al conectar con Google, código de estado HTTP: %d", resp.StatusCode)
 	return false
+}
+
+func configListener(requestService request.RequestService, mqCfg config.MQConfig) {
+	go func() {
+		// Conexión administrada para el consumer (con reconexión)
+		conn, _, err := config.RabbitConn(mqCfg)
+		if err != nil {
+			log.Fatalf("❌ Consumer Conn MQ: %v", err)
+		}
+
+		const queueName = "service.queue"
+		const routingKey = eventservice.RequestTopic
+		const exchange = eventservice.ExchangeName
+
+		consumerClient, err := rabbitmq.NewConsumer(
+			conn,
+			queueName,
+			rabbitmq.WithConsumerOptionsLogging,
+			rabbitmq.WithConsumerOptionsExchangeName(exchange),
+			rabbitmq.WithConsumerOptionsExchangeKind("topic"),
+			// 👇 sin QueueDeclare (no tocar la cola existente)
+			rabbitmq.WithConsumerOptionsQueueDurable,
+			rabbitmq.WithConsumerOptionsRoutingKey(routingKey),
+			rabbitmq.WithConsumerOptionsQOSPrefetch(5),
+			rabbitmq.WithConsumerOptionsConcurrency(5),
+			rabbitmq.WithConsumerOptionsConsumerName("api-stock-consumer"),
+		)
+		if err != nil {
+			log.Fatalf("❌ NewConsumer: %v", err)
+		}
+
+		// Run(handler) SIN opciones
+		err = consumerClient.Run(func(d rabbitmq.Delivery) rabbitmq.Action {
+			switch d.RoutingKey {
+			case routingKey:
+				var evt eventservice.RequestProcessEvent
+				if err := json.Unmarshal(d.Body, &evt); err != nil {
+					log.Printf("❌ parseando RequestProcessEvent: %v", err)
+					return rabbitmq.NackRequeue
+				}
+				if err := requestService.Process(evt.RequestID, evt.ClientAccountId, evt.TypeIngress); err != nil {
+					log.Printf("❌ error procesando request: %v", err)
+					return rabbitmq.NackRequeue
+				}
+				return rabbitmq.Ack
+			default:
+				log.Printf("⚠️ No hay handler para routing key: %s", d.RoutingKey)
+				return rabbitmq.Ack
+			}
+		})
+		if err != nil {
+			log.Fatalf("❌ Error en consumer.Run: %v", err)
+		}
+	}()
 }

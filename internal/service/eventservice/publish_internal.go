@@ -1,61 +1,28 @@
 package eventservice
 
 import (
-	"crypto/tls"
-	"crypto/x509"
+	"context"
 	"encoding/json"
-	"log"
 	"time"
 
-	"github.com/streadway/amqp"
+	"github.com/wagslane/go-rabbitmq"
 )
 
-func (p *MQPublisher) publishJSON(routingKey string, msg interface{}, headers amqp.Table) error {
+func (p *MQPublisher) publishJSON(routingKey string, msg any, headers map[string]any) error {
 	body, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	log.Println("Publishing JSON:", routingKey, body)
-
-	pub := amqp.Publishing{
-		ContentType:  "application/json",
-		DeliveryMode: amqp.Persistent, // persistente (2)
-		Timestamp:    time.Now(),
-		Headers:      headers,
-		Body:         body,
-	}
-
-	if p.connection.IsClosed() {
-		rootCAs, _ := x509.SystemCertPool()
-		tlsCfg := &tls.Config{RootCAs: rootCAs}
-
-		newConn, err := amqp.DialTLS(p.urlConnection, tlsCfg)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if newConn != nil {
-				newConn.Close()
-			}
-		}()
-
-		newCh, err := newConn.Channel()
-		if err != nil {
-			return err
-		}
-
-		// asignar y evitar que el defer cierre la conexión
-		p.connection = newConn
-		p.Channel = newCh
-		newConn = nil
-	}
-
-	return p.Channel.Publish(
-		ExchangeName,
-		routingKey,
-		false, // mandatory
-		false, // immediate (deprecado)
-		pub,
+	return p.pub.PublishWithContext(
+		ctx,
+		body,
+		[]string{routingKey},
+		rabbitmq.WithPublishOptionsExchange(ExchangeName),
+		rabbitmq.WithPublishOptionsPersistentDelivery,
+		rabbitmq.WithPublishOptionsContentType("application/json"),
+		rabbitmq.WithPublishOptionsHeaders(headers),
 	)
 }

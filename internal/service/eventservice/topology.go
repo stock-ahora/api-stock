@@ -1,20 +1,20 @@
 package eventservice
 
-import "github.com/streadway/amqp"
+import amqp "github.com/rabbitmq/amqp091-go"
 
 const (
-	ExchangeName      = "events.topic"
 	ExchangeKindTopic = "topic"
+	ExchangeName      = "events.topic"
 )
 
 func EnsureTopology(ch *amqp.Channel) error {
 	return ch.ExchangeDeclare(
 		ExchangeName,
 		ExchangeKindTopic,
-		true,  // durable
-		false, // auto-delete
-		false, // internal
-		false, // no-wait
-		nil,   // args
+		true,
+		false,
+		false,
+		false,
+		nil,
 	)
 }
