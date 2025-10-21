@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,20 +19,23 @@ type RequestHandler struct {
 }
 
 func (h *RequestHandler) List(w http.ResponseWriter, r *http.Request) {
-	requests, err := h.Service.List()
+
+	clientAccountId, err, _ := getClientAccountIdHeader(w, r)
+	page, size := parsePagination(r)
+
+	requests, err := h.Service.List(clientAccountId, page, size)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(requests)
 }
 
 func (h *RequestHandler) Create(w http.ResponseWriter, r *http.Request) {
 
-	clientAccountIDStr := r.Header.Get("X-Client-Account-Id")
-	clientAccountID, err := uuid.Parse(clientAccountIDStr)
-	if clientAccountIDStr == "" && err != nil {
-		http.Error(w, "El encabezado 'X-Client-Account-Id' es obligatorio", http.StatusBadRequest)
+	clientAccountID, err, done := getClientAccountIdHeader(w, r)
+	if done {
 		return
 	}
 
@@ -80,8 +85,19 @@ func (h *RequestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func getClientAccountIdHeader(w http.ResponseWriter, r *http.Request) (uuid.UUID, error, bool) {
+	clientAccountIDStr := r.Header.Get("X-Client-Account-Id")
+	clientAccountID, err := uuid.Parse(clientAccountIDStr)
+	if clientAccountIDStr == "" && err != nil {
+		http.Error(w, "El encabezado 'X-Client-Account-Id' es obligatorio", http.StatusBadRequest)
+		return uuid.UUID{}, nil, true
+	}
+	return clientAccountID, err, false
+}
+
 func (h *RequestHandler) Get(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+	segments := strings.Split(r.URL.Path, "/")
+	idStr := segments[len(segments)-1] // última parte del path
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		http.Error(w, "UUID inválido", http.StatusBadRequest)
@@ -92,6 +108,9 @@ func (h *RequestHandler) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+
 	json.NewEncoder(w).Encode(req)
 }
 
@@ -102,4 +121,26 @@ func detectContentType(file multipart.File, header *multipart.FileHeader) string
 	buf := make([]byte, 512)
 	n, _ := file.Read(buf)
 	return http.DetectContentType(buf[:n])
+}
+
+func parsePagination(r *http.Request) (page, size int) {
+	q := r.URL.Query()
+
+	// PAGE
+	pageStr := q.Get("page")
+	if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+		page = p
+	} else {
+		page = 1
+	}
+
+	// SIZE
+	sizeStr := q.Get("size")
+	if s, err := strconv.Atoi(sizeStr); err == nil && s > 0 {
+		size = s
+	} else {
+		size = 10
+	}
+
+	return
 }

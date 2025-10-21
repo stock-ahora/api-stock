@@ -26,6 +26,31 @@ type Documents struct {
 	UpdatedAt  time.Time `gorm:"column:update_at;autoUpdateTime"`
 }
 
+type RequestPerProduct struct {
+	ID         uuid.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey"`
+	ProductID  uuid.UUID `gorm:"column:product_id"`
+	MovementID uuid.UUID `gorm:"column:movement_id"`
+	RequestID  uuid.UUID `gorm:"column:request_id"`
+
+	Product  Product  `gorm:"foreignKey:ProductID"`
+	Movement Movement `gorm:"foreignKey:MovementID"`
+}
+
+type Movement struct {
+	ID             uuid.UUID `gorm:"column:id;type:uuid;default:uuid_generate_v4();primaryKey"`
+	Count          int       `gorm:"column:count"`
+	ProductID      uuid.UUID `gorm:"column:product_id;type:uuid"` // si lo usas directamente
+	DateLimit      time.Time `gorm:"column:date_limit"`
+	RequestID      uuid.UUID `gorm:"column:request_id;type:uuid"`
+	MovementTypeID int       `gorm:"column:movement_type_id;type:uuid"`
+
+	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt time.Time `gorm:"column:update_at;autoUpdateTime"`
+
+	// Relación N-N via tabla pivot
+	Products []Product `gorm:"many2many:request_per_product;joinForeignKey:MovementID;joinReferences:ProductID"`
+}
+
 type RequestStatus string
 
 const (
@@ -51,3 +76,9 @@ func (Request) TableName() string {
 func (Documents) TableName() string {
 	return "documents"
 }
+
+func (RequestPerProduct) TableName() string {
+	return "request_per_product"
+}
+
+func (Movement) TableName() string { return "movement" }

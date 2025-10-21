@@ -19,9 +19,9 @@ import (
 )
 
 type RequestService interface {
-	List() ([]models.Request, error)
+	List(clientAccountId uuid.UUID, page, size int) (dto.Page[dto.RequestListDto], error)
 	Create(*dto.CreateRequestDto, context.Context) (models.Request, error)
-	Get(uuid uuid.UUID) (models.Request, error)
+	Get(uuid uuid.UUID) (dto.RequestDto, error)
 	//todo: agregar metodo para confirmar la request y agregar en el open api el metodo igual
 	//todo: agregar metodo para modificar la request
 	Process(requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) error
@@ -48,11 +48,47 @@ func NewRequestService(db *gorm.DB, s3Svc *s3.S3Svc, eventSvc *eventservice.MQPu
 	return &requestService{db: db, s3Svc: s3Svc, eventSvc: eventSvc, textract: textract}
 }
 
-// implementación de metodos
+func (r requestService) List(clientAccountId uuid.UUID, page, size int) (dto.Page[dto.RequestListDto], error) {
 
-func (r requestService) List() ([]models.Request, error) {
-	//TODO implement me
-	panic("implement me")
+	offset := (page - 1) * size
+
+	var total int64
+	if err := r.db.Model(&models.Request{}).
+		Where("client_account_id = ?", clientAccountId).
+		Count(&total).Error; err != nil {
+		return dto.Page[dto.RequestListDto]{}, err
+	}
+
+	// DATA
+	var requests []models.Request
+	if err := r.db.
+		Where("client_account_id = ?", clientAccountId).
+		Order("create_at DESC").
+		Limit(size).
+		Offset(offset).
+		Find(&requests).Error; err != nil {
+		return dto.Page[dto.RequestListDto]{}, err
+	}
+
+	items := make([]dto.RequestListDto, 0, len(requests))
+	for _, req := range requests {
+		items = append(items, dto.RequestListDto{
+			ID:              req.ID,
+			RequestType:     dto.GetTypeMovementString(req.MovementTypeId),
+			Status:          req.Status,
+			CreatedAt:       req.CreatedAt,
+			UpdatedAt:       req.UpdatedAt,
+			ClientAccountId: req.ClientAccountID,
+		})
+	}
+
+	return dto.Page[dto.RequestListDto]{
+		Data:       items,
+		Total:      total,
+		Page:       page,
+		Size:       size,
+		TotalPages: int((total + int64(size) - 1) / int64(size)),
+	}, nil
 }
 
 func (r requestService) Create(requestDto *dto.CreateRequestDto, ctx context.Context) (models.Request, error) {
@@ -104,9 +140,48 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto, ctx context.Con
 	return request, nil
 }
 
-func (r requestService) Get(uuid uuid.UUID) (models.Request, error) {
-	//TODO implement me
-	panic("implement me")
+func (r requestService) Get(requestId uuid.UUID) (dto.RequestDto, error) {
+	var request models.Request
+	Request := r.db.Preload("Documents").First(&request, "id = ?", requestId)
+	if Request.Error != nil {
+		return dto.RequestDto{}, Request.Error
+	}
+
+	var rpp []models.RequestPerProduct
+
+	err := r.db.
+		Preload("Product").
+		Preload("Movement").
+		Where("request_id = ?", requestId).
+		Find(&rpp).Error
+	if err != nil {
+		return dto.RequestDto{}, err
+	}
+
+	// mapear al DTO
+	movements := make([]dto.Movements, 0, len(rpp))
+	for _, x := range rpp {
+		movements = append(movements, dto.Movements{
+			Id:        x.Movement.ID,
+			Nombre:    x.Product.Name,
+			Count:     x.Movement.Count,
+			CreatedAt: x.Movement.CreatedAt,
+			UpdatedAt: x.Movement.UpdatedAt,
+		})
+	}
+
+	requestDto := dto.RequestDto{
+		ID:              requestId,
+		RequestType:     dto.GetTypeMovementString(request.MovementTypeId),
+		Status:          request.Status,
+		CreatedAt:       request.CreatedAt,
+		UpdatedAt:       request.UpdatedAt,
+		ClientAccountId: request.ClientAccountID,
+		Movements:       movements,
+	}
+
+	return requestDto, nil
+
 }
 
 func createdRequestProcess(requestId uuid.UUID, clientAccountId uuid.UUID, movementType int) eventservice.RequestProcessEvent {
@@ -162,7 +237,11 @@ func (r requestService) Process(requestId uuid.UUID, clientAccountId uuid.UUID, 
 	}
 	log.Printf("Resultado de Bedrock para la solicitud %s: %+v", requestId, resultBedrock)
 
+	request.Status = models.RequestStatusPending
+
 	r.updateProduct(*resultBedrock, r.db, typeIngress, clientAccountId, requestId)
+
+	r.db.Save(&request)
 
 	return nil
 }

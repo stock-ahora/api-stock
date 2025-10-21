@@ -2,8 +2,10 @@ package dto
 
 import (
 	"mime/multipart"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/stock-ahora/api-stock/internal/models"
 )
 
 type CreateRequestDto struct {
@@ -16,6 +18,33 @@ type CreateRequestDto struct {
 	ClientAccountId uuid.UUID
 }
 
+type RequestListDto struct {
+	ID              uuid.UUID            `json:"id"`
+	RequestType     string               `json:"request_type"`
+	Status          models.RequestStatus `json:"status"`
+	CreatedAt       time.Time            `json:"created_at"`
+	UpdatedAt       time.Time            `json:"updated_at"`
+	ClientAccountId uuid.UUID            `json:"client_account_id"`
+}
+
+type RequestDto struct {
+	ID              uuid.UUID            `json:"id"`
+	RequestType     string               `json:"request_type"`
+	Status          models.RequestStatus `json:"status"`
+	CreatedAt       time.Time            `json:"created_at"`
+	UpdatedAt       time.Time            `json:"updated_at"`
+	ClientAccountId uuid.UUID            `json:"client_account_id"`
+	Movements       []Movements          `json:"movements"`
+}
+
+type Movements struct {
+	Id        uuid.UUID `json:"id"`
+	Nombre    string    `json:"nombre"`
+	Count     int       `json:"count"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type TypeStatus int
 
 const (
@@ -24,7 +53,7 @@ const (
 )
 
 func (t TypeStatus) String() string {
-	return [...]string{"in", "on"}[t]
+	return [...]string{"in", "out"}[t]
 }
 
 func ParseTypeStatus(typeStr string) TypeStatus {
@@ -36,6 +65,18 @@ func ParseTypeStatus(typeStr string) TypeStatus {
 	default:
 		return TypeStatusIn
 	}
+}
+
+func GetTypeMovementString(movement int) string {
+	switch movement {
+	case 1:
+		return "in"
+	case 2:
+		return "out"
+	default:
+		return "unknown"
+	}
+
 }
 
 func (s CreateRequestDto) GetTypeStatus() int {
@@ -56,4 +97,12 @@ func (s CreateRequestDto) GetMovementToUpOrLessStock() int {
 var TypeMovement = map[int]int{
 	-1: 2,
 	1:  1,
+}
+
+type Page[T any] struct {
+	Data       []T   `json:"data"`
+	Total      int64 `json:"total"`
+	Page       int   `json:"page"`
+	Size       int   `json:"size"`
+	TotalPages int   `json:"total_pages"`
 }
