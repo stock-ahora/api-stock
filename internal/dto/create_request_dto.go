@@ -45,6 +45,17 @@ type Movements struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type ProductDto struct {
+	ID          uuid.UUID `json:"id"`
+	Referencial uuid.UUID `json:"referencial_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Stock       int       `json:"stock"`
+	Status      string    `json:"status"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 type TypeStatus int
 
 const (

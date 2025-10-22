@@ -12,8 +12,10 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stock-ahora/api-stock/internal/config"
 	"github.com/stock-ahora/api-stock/internal/service/eventservice"
+	"github.com/stock-ahora/api-stock/internal/service/movement"
 	"github.com/stock-ahora/api-stock/internal/service/request"
 	"github.com/stock-ahora/api-stock/internal/service/s3"
+	"github.com/stock-ahora/api-stock/internal/service/stock"
 	"github.com/stock-ahora/api-stock/internal/service/textract"
 	"github.com/wagslane/go-rabbitmq"
 	"gorm.io/gorm"
@@ -25,12 +27,15 @@ const APIBasePath = "/api/v1/stock"
 const S3BasePath = APIBasePath + "/s3"
 const RequestBasePath = APIBasePath + "/request"
 const HealthPath = "/api/v1" + "/health"
+const MovementPath = APIBasePath + "/movement"
 
 func NewRouter(s3Config config.UploadService, db *gorm.DB, _ any, _ any, region string, _ string, mqConfig config.MQConfig) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID, middleware.Recoverer)
 	h := handlers.NewStatusHandler()
 	s3Svc := s3.NewS3Svs(s3.S3config{UploadService: s3Config})
+	stockSvc := stock.NewStockService(db)
+	movementSvc := movement.NewMovementService(db)
 
 	pub, urlConnectionMQ, err := config.RabbitPublisher(mqConfig)
 	if err != nil {
@@ -41,15 +46,34 @@ func NewRouter(s3Config config.UploadService, db *gorm.DB, _ any, _ any, region 
 	textractService := textract.NewTextractService(region)
 	requestService := request.NewRequestService(db, s3Svc, eventService, textractService)
 	handleRequest := &handlers.RequestHandler{Service: requestService}
+	handleStock := &handlers.StockHandler{Service: stockSvc}
+	movementHandler := &handlers.MovementHandler{Service: movementSvc}
 
 	configListener(requestService, mqConfig)
 	initHealthRoutes(r, h)
 
 	initRequestRoutes(r, handleRequest)
+	initStockRoutes(r, handleStock)
+	initMovementRoutes(r, movementHandler)
 
 	initTestGateway(r, *h)
 
 	return r
+}
+
+func initMovementRoutes(r *chi.Mux, handler *handlers.MovementHandler) {
+	r.Route(MovementPath, func(r chi.Router) {
+		r.Get("/{id}", handler.List)
+	})
+}
+
+func initStockRoutes(r *chi.Mux, requestService *handlers.StockHandler) {
+
+	r.Route(APIBasePath, func(r chi.Router) {
+		r.Get("/", requestService.List)
+		r.Get("/{id}", requestService.Get)
+	})
+
 }
 
 func initHealthRoutes(r *chi.Mux, h *handlers.StatusHandler) {
