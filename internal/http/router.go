@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/stock-ahora/api-stock/internal/config"
 	"github.com/stock-ahora/api-stock/internal/service/eventservice"
 	"github.com/stock-ahora/api-stock/internal/service/movement"
@@ -31,6 +32,15 @@ const MovementPath = APIBasePath + "/movement"
 
 func NewRouter(s3Config config.UploadService, db *gorm.DB, _ any, _ any, region string, _ string, mqConfig config.MQConfig) *chi.Mux {
 	r := chi.NewRouter()
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"*"}, // ← acepta cualquier origen
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"*"}, // ← acepta cualquier header
+		ExposedHeaders:   []string{"*"},
+		AllowCredentials: false,
+		MaxAge:           300, // cache del preflight
+	}))
+
 	r.Use(middleware.RequestID, middleware.Recoverer)
 	h := handlers.NewStatusHandler()
 	s3Svc := s3.NewS3Svs(s3.S3config{UploadService: s3Config})
