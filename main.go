@@ -39,6 +39,7 @@ func main() {
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 	}
+	go warmUp("http://internal-ALB-replace-21319724.us-east-2.elb.amazonaws.com:8082/api/v1/stock/health")
 
 	log.Printf("API listening on %s", addr)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -62,4 +63,19 @@ func getSecrets(ctx context.Context) *config.SecretApp {
 		log.Fatalf("config error: %v", err)
 	}
 	return cfg
+}
+
+func warmUp(albURL string) {
+	client := &http.Client{
+		Timeout: 2 * time.Second,
+	}
+	ticker := time.NewTicker(30 * time.Second)
+	for range ticker.C {
+		resp, err := client.Get(albURL)
+		if err != nil {
+			log.Println("warmup error:", err)
+			continue
+		}
+		_ = resp.Body.Close()
+	}
 }
