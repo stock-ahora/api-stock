@@ -39,7 +39,7 @@ func main() {
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 	}
-	go warmUp("http://internal-ALB-replace-21319724.us-east-2.elb.amazonaws.com:8082/api/v1/stock/health")
+	go warmUp("https://xe1qfkl3f5.execute-api.us-east-2.amazonaws.com/prod/api/v1/stock/request")
 
 	log.Printf("API listening on %s", addr)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
