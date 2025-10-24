@@ -24,7 +24,7 @@ import (
 	"github.com/stock-ahora/api-stock/internal/http/handlers"
 )
 
-const APIBasePath = "/api/v1/stock"
+const APIBasePath = "/prod/api/v1/stock"
 const S3BasePath = APIBasePath + "/s3"
 const RequestBasePath = APIBasePath + "/request"
 const HealthPath = "/api/v1" + "/health"
