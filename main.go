@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/stock-ahora/api-stock/internal/config"
 	"github.com/stock-ahora/api-stock/internal/http"
@@ -27,12 +28,20 @@ func main() {
 	s3 := config.S3ConfigService(cfg.ToS3Config())
 
 	log.Printf("S3 Configured: Bucket %s ", s3.Bucket)
-
+	_ = db.Exec("SELECT 1")
 	r := httpserver.NewRouter(*s3, db, nil, nil, cfg.S3Region, "", cfg.ToMQConfig())
 
 	addr := ":8082"
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      r,
+		IdleTimeout:  120 * time.Second, // clave para warm path
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+	}
+
 	log.Printf("API listening on %s", addr)
-	if err := http.ListenAndServe(addr, r); err != nil {
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 
