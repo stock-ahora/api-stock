@@ -19,12 +19,12 @@ import (
 )
 
 type RequestService interface {
-	List(clientAccountId uuid.UUID, page, size int) (dto.Page[dto.RequestListDto], error)
+	List(ctx context.Context, clientAccountId uuid.UUID, page, size int) (dto.Page[dto.RequestListDto], error)
 	Create(*dto.CreateRequestDto, context.Context) (models.Request, error)
-	Get(uuid uuid.UUID) (dto.RequestDto, error)
+	Get(ctx context.Context, uuid uuid.UUID) (dto.RequestDto, error)
 	//todo: agregar metodo para confirmar la request y agregar en el open api el metodo igual
 	//todo: agregar metodo para modificar la request
-	Process(requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) error
+	Process(ctx context.Context, requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) error
 	ProcessCtx(ctx context.Context, requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) interface{}
 }
 
@@ -37,7 +37,7 @@ type requestService struct {
 
 func (r requestService) ProcessCtx(ctx context.Context, requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) interface{} {
 
-	err := r.Process(requestId, clientAccountId, typeIngress)
+	err := r.Process(ctx, requestId, clientAccountId, typeIngress)
 	if err != nil {
 		return nil
 	}
@@ -48,12 +48,12 @@ func NewRequestService(db *gorm.DB, s3Svc *s3.S3Svc, eventSvc *eventservice.MQPu
 	return &requestService{db: db, s3Svc: s3Svc, eventSvc: eventSvc, textract: textract}
 }
 
-func (r requestService) List(clientAccountId uuid.UUID, page, size int) (dto.Page[dto.RequestListDto], error) {
+func (r requestService) List(ctx context.Context, clientAccountId uuid.UUID, page, size int) (dto.Page[dto.RequestListDto], error) {
 
 	offset := (page - 1) * size
 
 	var total int64
-	if err := r.db.Model(&models.Request{}).
+	if err := r.db.WithContext(ctx).Model(&models.Request{}).
 		Where("client_account_id = ?", clientAccountId).
 		Count(&total).Error; err != nil {
 		return dto.Page[dto.RequestListDto]{}, err
@@ -61,7 +61,7 @@ func (r requestService) List(clientAccountId uuid.UUID, page, size int) (dto.Pag
 
 	// DATA
 	var requests []models.Request
-	if err := r.db.
+	if err := r.db.WithContext(ctx).
 		Where("client_account_id = ?", clientAccountId).
 		Order("create_at DESC").
 		Limit(size).
@@ -116,7 +116,7 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto, ctx context.Con
 		CreatedAt: time.Now(),
 	}
 
-	err = r.db.Transaction(func(tx *gorm.DB) error {
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Debug().Create(&request).Error; err != nil {
 			return err
 		}
@@ -140,16 +140,16 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto, ctx context.Con
 	return request, nil
 }
 
-func (r requestService) Get(requestId uuid.UUID) (dto.RequestDto, error) {
+func (r requestService) Get(ctx context.Context, requestId uuid.UUID) (dto.RequestDto, error) {
 	var request models.Request
-	Request := r.db.Preload("Documents").First(&request, "id = ?", requestId)
+	Request := r.db.WithContext(ctx).Preload("Documents").First(&request, "id = ?", requestId)
 	if Request.Error != nil {
 		return dto.RequestDto{}, Request.Error
 	}
 
 	var rpp []models.RequestPerProduct
 
-	err := r.db.
+	err := r.db.WithContext(ctx).
 		Preload("Product").
 		Preload("Movement").
 		Where("request_id = ?", requestId).
@@ -192,11 +192,11 @@ func createdRequestProcess(requestId uuid.UUID, clientAccountId uuid.UUID, movem
 	}
 }
 
-func (r requestService) Process(requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) error {
+func (r requestService) Process(ctx context.Context, requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) error {
 	log.Printf("Procesando solicitud con ID: %s", requestId)
 
 	var request models.Request
-	result := r.db.Preload("Documents").First(&request, "id = ?", requestId)
+	result := r.db.WithContext(ctx).Preload("Documents").First(&request, "id = ?", requestId)
 	log.Printf("Resultado de la consulta: %+v", result)
 	if result.Error != nil {
 		log.Printf("Error al obtener la solicitud: %v", result.Error)
@@ -222,8 +222,6 @@ func (r requestService) Process(requestId uuid.UUID, clientAccountId uuid.UUID, 
 
 	log.Printf("Resultado de Textract para la solicitud %s:", requestId)
 
-	ctx := context.Background()
-
 	bedrockService := bedrock.NewBedrockService(ctx, bedrock.NOVA_PRO_AWS, "us-east-1")
 
 	inputModel := textract.TablasToString(*resultTextract)
@@ -239,14 +237,14 @@ func (r requestService) Process(requestId uuid.UUID, clientAccountId uuid.UUID, 
 
 	request.Status = models.RequestStatusPending
 
-	r.updateProduct(*resultBedrock, r.db, typeIngress, clientAccountId, requestId)
+	r.updateProduct(ctx, *resultBedrock, r.db, typeIngress, clientAccountId, requestId)
 
-	r.db.Save(&request)
+	r.db.WithContext(ctx).Save(&request)
 
 	return nil
 }
 
-func (r requestService) updateProduct(productsFind []bedrock.ProductResponse, db *gorm.DB, typeIngress int, clientAccountId uuid.UUID, requestId uuid.UUID) {
+func (r requestService) updateProduct(ctx context.Context, productsFind []bedrock.ProductResponse, db *gorm.DB, typeIngress int, clientAccountId uuid.UUID, requestId uuid.UUID) {
 
 	listMovement := make([]eventservice.ProductPerMovement, 0, len(productsFind))
 
@@ -257,16 +255,16 @@ func (r requestService) updateProduct(productsFind []bedrock.ProductResponse, db
 
 		var existSku = false
 
-		existSku = findSku(product, db, &requestSku, existSku)
+		existSku = findSku(product, db, &requestSku, existSku, ctx)
 
 		if existSku {
 			countUpdate := product.Count * typeIngress
 
-			_ = db.First(&productUpdate, "id = ?", &requestSku.ProductID)
+			_ = db.WithContext(ctx).First(&productUpdate, "id = ?", &requestSku.ProductID)
 
 			productUpdate.Stock = productUpdate.Stock + countUpdate
 
-			db.Save(&productUpdate)
+			db.WithContext(ctx).Save(&productUpdate)
 
 		} else {
 
@@ -277,7 +275,7 @@ func (r requestService) updateProduct(productsFind []bedrock.ProductResponse, db
 			productUpdate.Status = "active"
 			productUpdate.ClientAccount = clientAccountId
 
-			db.Create(&productUpdate)
+			db.WithContext(ctx).Create(&productUpdate)
 
 			requestSku.ID = uuid.New()
 			requestSku.NameSku = product.SKUs[0]
@@ -285,7 +283,7 @@ func (r requestService) updateProduct(productsFind []bedrock.ProductResponse, db
 			requestSku.ProductID = productUpdate.ID
 			requestSku.CreatedAt = time.Now()
 
-			db.Create(&requestSku)
+			db.WithContext(ctx).Create(&requestSku)
 		}
 
 		listMovement = append(listMovement, createMovement(productUpdate, product.Count, typeIngress))
@@ -327,10 +325,10 @@ func notificationMovement() {
 	//TODO implement me
 }
 
-func findSku(product bedrock.ProductResponse, db *gorm.DB, requestSku *models.Sku, existSku bool) bool {
+func findSku(product bedrock.ProductResponse, db *gorm.DB, requestSku *models.Sku, existSku bool, ctx context.Context) bool {
 	for _, sku := range product.SKUs {
 
-		resultSku := db.Where("name_sku ILIKE ?", "%"+sku+"%").Find(&requestSku)
+		resultSku := db.WithContext(ctx).Where("name_sku ILIKE ?", "%"+sku+"%").Find(&requestSku)
 		if resultSku.Error != nil {
 			log.Printf("Error al procesar con Bedrock: %v", resultSku.Error)
 		}

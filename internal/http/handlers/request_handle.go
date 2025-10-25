@@ -20,10 +20,13 @@ type RequestHandler struct {
 
 func (h *RequestHandler) List(w http.ResponseWriter, r *http.Request) {
 
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
 	clientAccountId, err, _ := getClientAccountIdHeader(w, r)
 	page, size := parsePagination(r)
 
-	requests, err := h.Service.List(clientAccountId, page, size)
+	requests, err := h.Service.List(ctx, clientAccountId, page, size)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -96,6 +99,10 @@ func getClientAccountIdHeader(w http.ResponseWriter, r *http.Request) (uuid.UUID
 }
 
 func (h *RequestHandler) Get(w http.ResponseWriter, r *http.Request) {
+
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
 	segments := strings.Split(r.URL.Path, "/")
 	idStr := segments[len(segments)-1] // última parte del path
 	id, err := uuid.Parse(idStr)
@@ -103,7 +110,7 @@ func (h *RequestHandler) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "UUID inválido", http.StatusBadRequest)
 		return
 	}
-	req, err := h.Service.Get(id)
+	req, err := h.Service.Get(ctx, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
