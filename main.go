@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"runtime"
 	"time"
 
 	"github.com/stock-ahora/api-stock/internal/config"
@@ -39,6 +40,15 @@ func main() {
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 	}
+
+	go func() {
+		for range time.Tick(10 * time.Second) {
+			buf := make([]byte, 1<<20)
+			n := runtime.Stack(buf, true)
+			log.Printf("\n\n=== STACK DUMP ===\n%s\n\n", buf[:n])
+		}
+	}()
+
 	startWatchdog()
 
 	log.Printf("API listening on %s", addr)
