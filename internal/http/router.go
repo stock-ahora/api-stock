@@ -50,7 +50,8 @@ func NewRouter(s3Config config.UploadService, db *gorm.DB, _ any, _ any, region 
 
 	pub, urlConnectionMQ, err := config.RabbitPublisher(mqConfig)
 	if err != nil {
-		log.Fatalf("❌ Publisher MQ: %v", err)
+		log.Printf("skip publish: MQ unavailable")
+		pub = nil // degradamos, NO panic
 	}
 	eventService := eventservice.NewMQPublisher(pub, urlConnectionMQ)
 
@@ -140,7 +141,8 @@ func configListener(requestService request.RequestService, mqCfg config.MQConfig
 		// Conexión administrada para el consumer (con reconexión)
 		conn, _, err := config.RabbitConn(mqCfg)
 		if err != nil {
-			log.Fatalf("❌ Consumer Conn MQ: %v", err)
+			log.Printf("MQ publisher error: %v", err)
+			conn = nil
 		}
 
 		const queueName = "service.queue"

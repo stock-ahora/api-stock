@@ -39,7 +39,7 @@ func main() {
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 	}
-	go warmUp("https://xe1qfkl3f5.execute-api.us-east-2.amazonaws.com/prod/api/v1/stock/request")
+	startWatchdog()
 
 	log.Printf("API listening on %s", addr)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -65,17 +65,21 @@ func getSecrets(ctx context.Context) *config.SecretApp {
 	return cfg
 }
 
-func warmUp(albURL string) {
-	client := &http.Client{
-		Timeout: 2 * time.Second,
-	}
-	ticker := time.NewTicker(30 * time.Second)
-	for range ticker.C {
-		resp, err := client.Get(albURL)
-		if err != nil {
-			log.Println("warmup error:", err)
-			continue
+func startWatchdog() {
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		for range ticker.C {
+			req, _ := http.NewRequest("GET", "http://127.0.0.1:8082/api/v1/health", nil)
+			c := http.Client{Timeout: 2 * time.Second}
+			resp, err := c.Do(req)
+			if err != nil {
+				log.Printf("⚠ WATCHDOG: server unreachable locally: %v", err)
+				continue
+			}
+			_ = resp.Body.Close()
+			if resp.StatusCode != 200 {
+				log.Printf("⚠ WATCHDOG: health returned %d", resp.StatusCode)
+			}
 		}
-		_ = resp.Body.Close()
-	}
+	}()
 }
