@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"sync"
@@ -12,9 +11,11 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-var db *gorm.DB
-var dsn string
-var mu sync.Mutex
+var (
+	GlobalDB  *gorm.DB
+	globalDSN string
+	mu        sync.Mutex
+)
 
 func NewPostgresDB(cfg DBConfig) (*gorm.DB, error) {
 
@@ -34,6 +35,9 @@ func NewPostgresDB(cfg DBConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("no se pudo conectar a la base de datos: %w", err)
 	}
 
+	GlobalDB = db
+	globalDSN = dsn
+
 	// Configurar pool de conexiones
 	sqlDB, err := db.DB()
 	if err != nil {
@@ -52,32 +56,30 @@ func ReconnectDB() error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	sqlDB, _ := db.DB()
-	sqlDB.Close() // cerramos pool actual
+	sqlDB, _ := GlobalDB.DB()
+	sqlDB.Close()
 
-	newDb, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	newDb, err := gorm.Open(postgres.Open(globalDSN), &gorm.Config{})
 	if err != nil {
 		return err
 	}
-
-	db = newDb
+	GlobalDB = newDb
 	return nil
 }
 
-func PingDbWithRetry(ctx context.Context) error {
-	sqlDB, _ := db.DB()
-
-	// primer intento
-	if err := sqlDB.PingContext(ctx); err == nil {
-		return nil
+func GetDB() *gorm.DB {
+	if GlobalDB == nil {
+		// primera carga o crash previo
+		_ = ReconnectDB()
+		return GlobalDB
 	}
 
-	log.Println("⚠ DB ping falló — intentando reconectar...")
-	if err := ReconnectDB(); err != nil {
-		return err
+	// tiny ping
+	sqlDB, _ := GlobalDB.DB()
+	if err := sqlDB.Ping(); err != nil {
+		// pool muerto => reconstruir
+		_ = ReconnectDB()
 	}
 
-	// segundo intento después de reconectar
-	sqlDB, _ = db.DB()
-	return sqlDB.PingContext(ctx)
+	return GlobalDB
 }

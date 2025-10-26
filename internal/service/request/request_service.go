@@ -51,14 +51,12 @@ func NewRequestService(db *gorm.DB, s3Svc *s3.S3Svc, eventSvc *eventservice.MQPu
 
 func (r requestService) List(ctx context.Context, clientAccountId uuid.UUID, page, size int) (dto.Page[dto.RequestListDto], error) {
 
-	err := config.PingDbWithRetry(ctx)
-	if err != nil {
-		return dto.Page[dto.RequestListDto]{}, err
-	}
+	db := config.GetDB()
+
 	offset := (page - 1) * size
 
 	var total int64
-	if err := r.db.WithContext(ctx).Model(&models.Request{}).
+	if err := db.WithContext(ctx).Model(&models.Request{}).
 		Where("client_account_id = ?", clientAccountId).
 		Count(&total).Error; err != nil {
 		return dto.Page[dto.RequestListDto]{}, err
@@ -66,7 +64,7 @@ func (r requestService) List(ctx context.Context, clientAccountId uuid.UUID, pag
 
 	// DATA
 	var requests []models.Request
-	if err := r.db.WithContext(ctx).
+	if err := db.WithContext(ctx).
 		Where("client_account_id = ?", clientAccountId).
 		Order("create_at DESC").
 		Limit(size).
@@ -98,10 +96,7 @@ func (r requestService) List(ctx context.Context, clientAccountId uuid.UUID, pag
 
 func (r requestService) Create(requestDto *dto.CreateRequestDto, ctx context.Context) (models.Request, error) {
 
-	err := config.PingDbWithRetry(ctx)
-	if err != nil {
-		return models.Request{}, err
-	}
+	db := config.GetDB()
 
 	key, err := r.s3Svc.DoHandleUpload(requestDto, "requests/")
 
@@ -126,7 +121,7 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto, ctx context.Con
 		CreatedAt: time.Now(),
 	}
 
-	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Debug().Create(&request).Error; err != nil {
 			return err
 		}
@@ -151,20 +146,17 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto, ctx context.Con
 }
 
 func (r requestService) Get(ctx context.Context, requestId uuid.UUID) (dto.RequestDto, error) {
-	err := config.PingDbWithRetry(ctx)
-	if err != nil {
-		return dto.RequestDto{}, err
-	}
+	db := config.GetDB()
 
 	var request models.Request
-	Request := r.db.WithContext(ctx).Preload("Documents").First(&request, "id = ?", requestId)
+	Request := db.WithContext(ctx).Preload("Documents").First(&request, "id = ?", requestId)
 	if Request.Error != nil {
 		return dto.RequestDto{}, Request.Error
 	}
 
 	var rpp []models.RequestPerProduct
 
-	err = r.db.WithContext(ctx).
+	err := db.WithContext(ctx).
 		Preload("Product").
 		Preload("Movement").
 		Where("request_id = ?", requestId).
@@ -209,15 +201,12 @@ func createdRequestProcess(requestId uuid.UUID, clientAccountId uuid.UUID, movem
 
 func (r requestService) Process(ctx context.Context, requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) error {
 
-	err := config.PingDbWithRetry(ctx)
-	if err != nil {
-		return err
-	}
+	db := config.GetDB()
 
 	log.Printf("Procesando solicitud con ID: %s", requestId)
 
 	var request models.Request
-	result := r.db.WithContext(ctx).Preload("Documents").First(&request, "id = ?", requestId)
+	result := db.WithContext(ctx).Preload("Documents").First(&request, "id = ?", requestId)
 	log.Printf("Resultado de la consulta: %+v", result)
 	if result.Error != nil {
 		log.Printf("Error al obtener la solicitud: %v", result.Error)
@@ -258,19 +247,14 @@ func (r requestService) Process(ctx context.Context, requestId uuid.UUID, client
 
 	request.Status = models.RequestStatusPending
 
-	r.updateProduct(ctx, *resultBedrock, r.db, typeIngress, clientAccountId, requestId)
+	r.updateProduct(ctx, *resultBedrock, db, typeIngress, clientAccountId, requestId)
 
-	r.db.WithContext(ctx).Save(&request)
+	db.WithContext(ctx).Save(&request)
 
 	return nil
 }
 
 func (r requestService) updateProduct(ctx context.Context, productsFind []bedrock.ProductResponse, db *gorm.DB, typeIngress int, clientAccountId uuid.UUID, requestId uuid.UUID) {
-
-	err := config.PingDbWithRetry(ctx)
-	if err != nil {
-		return
-	}
 
 	listMovement := make([]eventservice.ProductPerMovement, 0, len(productsFind))
 
