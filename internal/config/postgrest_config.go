@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -44,9 +43,9 @@ func NewPostgresDB(cfg DBConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("error obteniendo DB: %w", err)
 	}
 
-	sqlDB.SetMaxOpenConns(25)                 // conexiones máximas abiertas
-	sqlDB.SetMaxIdleConns(25)                 // conexiones en reposo
-	sqlDB.SetConnMaxLifetime(5 * time.Minute) // tiempo máximo de vida de una conexión
+	sqlDB.SetMaxOpenConns(25) // conexiones máximas abiertas
+	sqlDB.SetMaxIdleConns(25) // conexiones en reposo
+	//sqlDB.SetConnMaxLifetime(5 * time.Minute) // tiempo máximo de vida de una conexión
 
 	log.Println("✅ Conectado a PostgreSQL correctamente")
 	return db, nil
