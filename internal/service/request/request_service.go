@@ -9,6 +9,7 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/stock-ahora/api-stock/internal/config"
 	"github.com/stock-ahora/api-stock/internal/dto"
 	"github.com/stock-ahora/api-stock/internal/models"
 	"github.com/stock-ahora/api-stock/internal/service/bedrock"
@@ -50,6 +51,10 @@ func NewRequestService(db *gorm.DB, s3Svc *s3.S3Svc, eventSvc *eventservice.MQPu
 
 func (r requestService) List(ctx context.Context, clientAccountId uuid.UUID, page, size int) (dto.Page[dto.RequestListDto], error) {
 
+	err := config.PingDbWithRetry(ctx)
+	if err != nil {
+		return dto.Page[dto.RequestListDto]{}, err
+	}
 	offset := (page - 1) * size
 
 	var total int64
@@ -92,6 +97,11 @@ func (r requestService) List(ctx context.Context, clientAccountId uuid.UUID, pag
 }
 
 func (r requestService) Create(requestDto *dto.CreateRequestDto, ctx context.Context) (models.Request, error) {
+
+	err := config.PingDbWithRetry(ctx)
+	if err != nil {
+		return models.Request{}, err
+	}
 
 	key, err := r.s3Svc.DoHandleUpload(requestDto, "requests/")
 
@@ -141,6 +151,11 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto, ctx context.Con
 }
 
 func (r requestService) Get(ctx context.Context, requestId uuid.UUID) (dto.RequestDto, error) {
+	err := config.PingDbWithRetry(ctx)
+	if err != nil {
+		return dto.RequestDto{}, err
+	}
+
 	var request models.Request
 	Request := r.db.WithContext(ctx).Preload("Documents").First(&request, "id = ?", requestId)
 	if Request.Error != nil {
@@ -149,7 +164,7 @@ func (r requestService) Get(ctx context.Context, requestId uuid.UUID) (dto.Reque
 
 	var rpp []models.RequestPerProduct
 
-	err := r.db.WithContext(ctx).
+	err = r.db.WithContext(ctx).
 		Preload("Product").
 		Preload("Movement").
 		Where("request_id = ?", requestId).
@@ -193,6 +208,12 @@ func createdRequestProcess(requestId uuid.UUID, clientAccountId uuid.UUID, movem
 }
 
 func (r requestService) Process(ctx context.Context, requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) error {
+
+	err := config.PingDbWithRetry(ctx)
+	if err != nil {
+		return err
+	}
+
 	log.Printf("Procesando solicitud con ID: %s", requestId)
 
 	var request models.Request
@@ -245,6 +266,11 @@ func (r requestService) Process(ctx context.Context, requestId uuid.UUID, client
 }
 
 func (r requestService) updateProduct(ctx context.Context, productsFind []bedrock.ProductResponse, db *gorm.DB, typeIngress int, clientAccountId uuid.UUID, requestId uuid.UUID) {
+
+	err := config.PingDbWithRetry(ctx)
+	if err != nil {
+		return
+	}
 
 	listMovement := make([]eventservice.ProductPerMovement, 0, len(productsFind))
 
