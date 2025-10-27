@@ -21,6 +21,7 @@ type SecretApp struct {
 	MQ_PORT     int    `json:"MQ_PORT"`
 	MQ_USER     string `json:"MQ_USER_STOCK"`
 	MQ_VHOST    string `json:"MQ_VHOST"`
+	DBStarts    string `json:"start_db"`
 }
 
 type DBConfig struct {
@@ -29,6 +30,7 @@ type DBConfig struct {
 	User     string
 	Password string
 	DBName   string
+	DBSTATS  string
 	SSLMode  string
 }
 
@@ -63,6 +65,7 @@ func (s SecretApp) ToDBConfig() DBConfig {
 		Password: s.Pass,
 		DBName:   s.Name,
 		SSLMode:  s.SSL,
+		DBSTATS:  s.DBStarts,
 	}
 }
 

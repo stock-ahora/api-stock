@@ -238,7 +238,7 @@ func (r requestService) Process(ctx context.Context, requestId uuid.UUID, client
 
 	log.Printf("Input para Bedrock: %s", inputModel)
 
-	resultBedrock, err := bedrockService.FormatProduct(ctx, inputModel)
+	resultBedrock, err := bedrockService.FormatProduct(ctx, inputModel, bedrock.ProductoPrompt)
 
 	if err != nil {
 		log.Printf("Error al procesar con Bedrock: %v", err)

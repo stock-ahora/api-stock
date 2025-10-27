@@ -29,8 +29,10 @@ const S3BasePath = APIBasePath + "/s3"
 const RequestBasePath = APIBasePath + "/request"
 const HealthPath = "/api/v1" + "/health"
 const MovementPath = APIBasePath + "/movement"
+const ChatBot = APIBasePath + "/chatbot"
+const DashboardPath = "/prod/api/v1" + "/dashboard"
 
-func NewRouter(s3Config config.UploadService, db *gorm.DB, _ any, _ any, region string, _ string, mqConfig config.MQConfig) *chi.Mux {
+func NewRouter(s3Config config.UploadService, db *gorm.DB, dbStarts *gorm.DB, _ any, _ any, region string, _ string, mqConfig config.MQConfig) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(cors.Handler(cors.Options{
@@ -59,6 +61,8 @@ func NewRouter(s3Config config.UploadService, db *gorm.DB, _ any, _ any, region 
 	requestService := request.NewRequestService(db, s3Svc, eventService, textractService)
 	handleRequest := &handlers.RequestHandler{Service: requestService}
 	handleStock := &handlers.StockHandler{Service: stockSvc}
+	handleChatBot := &handlers.BedbrockHandler{Db: db}
+	habdleDashboard := &handlers.DashboardHandler{Db: dbStarts}
 	movementHandler := &handlers.MovementHandler{Service: movementSvc}
 
 	configListener(requestService, mqConfig)
@@ -67,10 +71,26 @@ func NewRouter(s3Config config.UploadService, db *gorm.DB, _ any, _ any, region 
 	initRequestRoutes(r, handleRequest)
 	initStockRoutes(r, handleStock)
 	initMovementRoutes(r, movementHandler)
+	initChatRoutes(r, handleChatBot)
+	initDashboardRoutes(r, habdleDashboard)
 
 	initTestGateway(r, *h)
 
 	return r
+}
+
+func initDashboardRoutes(r *chi.Mux, dashboard *handlers.DashboardHandler) {
+
+	r.Route(DashboardPath, func(r chi.Router) {
+		r.Get("/", dashboard.Get)
+	})
+
+}
+
+func initChatRoutes(r *chi.Mux, bot *handlers.BedbrockHandler) {
+	r.Route(ChatBot, func(r chi.Router) {
+		r.Get("/", bot.ConsultaProductos)
+	})
 }
 
 func initMovementRoutes(r *chi.Mux, handler *handlers.MovementHandler) {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"runtime"
 	"time"
 
 	"github.com/stock-ahora/api-stock/internal/config"
@@ -20,7 +19,7 @@ func main() {
 	cfg := getSecrets(ctx)
 
 	//conectamos a la base de datos
-	db := getDbConfig(cfg)
+	db, DBStarts := getDbConfig(cfg)
 
 	//ejecutamos migraciones
 	config.RunMigrations(cfg.ToDBConfig())
@@ -30,7 +29,7 @@ func main() {
 
 	log.Printf("S3 Configured: Bucket %s ", s3.Bucket)
 	_ = db.Exec("SELECT 1")
-	r := httpserver.NewRouter(*s3, db, nil, nil, cfg.S3Region, "", cfg.ToMQConfig())
+	r := httpserver.NewRouter(*s3, db, DBStarts, nil, nil, cfg.S3Region, "", cfg.ToMQConfig())
 
 	addr := ":8082"
 	srv := &http.Server{
@@ -41,14 +40,6 @@ func main() {
 		WriteTimeout: 15 * time.Second,
 	}
 
-	go func() {
-		for range time.Tick(10 * time.Second) {
-			buf := make([]byte, 1<<20)
-			n := runtime.Stack(buf, true)
-			log.Printf("\n\n=== STACK DUMP ===\n%s\n\n", buf[:n])
-		}
-	}()
-
 	//startWatchdog()
 
 	log.Printf("API listening on %s", addr)
@@ -58,13 +49,13 @@ func main() {
 
 }
 
-func getDbConfig(cfg *config.SecretApp) *gorm.DB {
-	db, err := config.NewPostgresDB(cfg.ToDBConfig())
+func getDbConfig(cfg *config.SecretApp) (*gorm.DB, *gorm.DB) {
+	db, DBStarts, err := config.NewPostgresDB(cfg.ToDBConfig())
 	if err != nil {
 		log.Fatalf("DB error: %v", err)
 	}
 	log.Println("DB Connection Established")
-	return db
+	return db, DBStarts
 }
 
 func getSecrets(ctx context.Context) *config.SecretApp {
@@ -74,22 +65,3 @@ func getSecrets(ctx context.Context) *config.SecretApp {
 	}
 	return cfg
 }
-
-//func startWatchdog() {
-//go func() {
-//ticker := time.NewTicker(60 * time.Second)
-//for range ticker.C {
-//req, _ := http.NewRequest("GET", "http://127.0.0.1:8082/api/v1/health", nil)
-//c := http.Client{Timeout: 2 * time.Second}
-//resp, err := c.Do(req)
-//if err != nil {
-//log.Printf("⚠ WATCHDOG: server unreachable locally: %v", err)
-//	continue
-//}
-//_ = resp.Body.Close()
-//if resp.StatusCode != 200 {
-//log.Printf("⚠ WATCHDOG: health returned %d", resp.StatusCode)
-//			}
-//		}
-//	}()
-//}
