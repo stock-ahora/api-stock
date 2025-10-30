@@ -44,8 +44,8 @@ type Movement struct {
 	RequestID      uuid.UUID `gorm:"column:request_id;type:uuid"`
 	MovementTypeID int       `gorm:"column:movement_type_id;type:uuid"`
 
-	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt time.Time `gorm:"column:update_at;autoUpdateTime"`
+	CreatedAt time.Time `gorm:"column:create_at;autoCreateTime"`
+	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime"`
 
 	// Relación N-N via tabla pivot
 	Products []Product `gorm:"many2many:request_per_product;joinForeignKey:MovementID;joinReferences:ProductID"`
