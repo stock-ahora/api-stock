@@ -29,7 +29,7 @@ func (d DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(result)
 	case "topProducts":
 
-		result, _ := d.GetTopProducts(clienteID, 5)
+		result, _ := d.GetTopProducts(clienteID, 7)
 		json.NewEncoder(w).Encode(result)
 
 	case "stockTrend":
