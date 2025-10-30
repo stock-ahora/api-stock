@@ -296,7 +296,11 @@ func (r requestService) updateProduct(ctx context.Context, productsFind []bedroc
 			db.WithContext(ctx).Create(&requestSku)
 		}
 
-		listMovement = append(listMovement, createMovement(productUpdate, product.Count, typeIngress))
+		movement := createMovement(productUpdate, product.Count, typeIngress)
+
+		listMovement = append(listMovement, movement)
+		r.publicProductEtl(productUpdate, requestSku, clientAccountId, movement, typeIngress, requestId)
+
 	}
 
 	movementsRequest := eventservice.MovementsEvent{
@@ -329,6 +333,24 @@ func (r requestService) eventMovement(movements eventservice.MovementsEvent) {
 		log.Printf("Error al publicar el evento de movimientos: %v", err)
 	}
 
+}
+
+func (r requestService) publicProductEtl(product models.Product, sku models.Sku, id uuid.UUID, movement eventservice.ProductPerMovement, typeIngress int, requestId uuid.UUID) {
+
+	err := r.eventSvc.PublishProductEtl(eventservice.ProductEvent{
+		ProductoID:      product.ID.String(),
+		NombreProducto:  product.Name,
+		ClienteID:       id.String(),
+		Cantidad:        movement.Count,
+		Signo:           typeIngress,
+		Fecha:           movement.CreatedAt,
+		SolicitudId:     requestId.String(),
+		StatusSolicitud: "pending",
+		TipoMovimiento:  fmt.Sprintf("%d", movement.MovementTypeId),
+	})
+	if err != nil {
+		return
+	}
 }
 
 func notificationMovement() {

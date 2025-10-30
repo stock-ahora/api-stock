@@ -40,3 +40,16 @@ type RequestProcessEvent struct {
 	ClientAccountId uuid.UUID `json:"client_account_id"`
 	TypeIngress     int       `json:"type_ingress"`
 }
+
+type ProductEvent struct {
+	BaseEvent
+	ProductoID      string    `json:"producto_id"`
+	NombreProducto  string    `json:"nombre_producto"`
+	ClienteID       string    `json:"cliente_id"`
+	Cantidad        int       `json:"cantidad"`
+	Signo           int       `json:"signo"` // 1 ingreso, -1 egreso
+	Fecha           time.Time `json:"fecha"`
+	SolicitudId     string    `json:"solicitud_id"`
+	StatusSolicitud string    `json:"status_solicitud"`
+	TipoMovimiento  string    `json:"tipo_movimiento"`
+}

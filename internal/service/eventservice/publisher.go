@@ -16,6 +16,7 @@ type EventPublisher interface {
 
 const MovementTopic = "movement.generated"
 const RequestTopic = "Request.process.prod"
+const EtlProduct = "Product.etl.prod"
 
 type MQPublisher struct {
 	pub           *rabbitmq.Publisher
@@ -64,6 +65,28 @@ func (p *MQPublisher) PublishMovements(e MovementsEvent) error {
 
 	log.Println("Publishing movement event:", e)
 	return p.publishJSON(MovementTopic, e, map[string]any{
+		"type":          "document",
+		"version":       e.Version,
+		"correlationId": e.CorrelationID,
+	}, context.Background())
+}
+
+func (p *MQPublisher) PublishProductEtl(e ProductEvent) error {
+	if e.EventID == "" {
+		e.EventID = newUUID()
+	}
+	if e.EventType == "" {
+		e.EventType = "document"
+	}
+	if e.Version == "" {
+		e.Version = "1"
+	}
+	if e.OccurredAt.IsZero() {
+		e.OccurredAt = time.Now().UTC()
+	}
+
+	log.Println("publish  etl:", e)
+	return p.publishJSON(EtlProduct, e, map[string]any{
 		"type":          "document",
 		"version":       e.Version,
 		"correlationId": e.CorrelationID,

@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"runtime/debug"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/stock-ahora/api-stock/internal/config"
+	"github.com/stock-ahora/api-stock/internal/service/Etl_service"
 	"github.com/stock-ahora/api-stock/internal/service/eventservice"
 	"github.com/stock-ahora/api-stock/internal/service/movement"
 	"github.com/stock-ahora/api-stock/internal/service/request"
@@ -64,8 +64,9 @@ func NewRouter(s3Config config.UploadService, db *gorm.DB, dbStarts *gorm.DB, _ 
 	handleChatBot := &handlers.BedbrockHandler{Db: db}
 	habdleDashboard := &handlers.DashboardHandler{Db: dbStarts}
 	movementHandler := &handlers.MovementHandler{Service: movementSvc}
+	etlService := Etl_service.EtlService{Db: dbStarts}
 
-	configListener(requestService, mqConfig)
+	configListener(etlService, requestService, mqConfig)
 	initHealthRoutes(r, h)
 
 	initRequestRoutes(r, handleRequest)
@@ -156,78 +157,97 @@ func CheckNATGateway() bool {
 	return false
 }
 
-func configListener(requestService request.RequestService, mqCfg config.MQConfig) {
-	go func() {
-		// Conexión administrada para el consumer (con reconexión)
-		conn, _, err := config.RabbitConn(mqCfg)
-		if err != nil {
-			log.Printf("MQ publisher error: %v", err)
-			conn = nil
+func configListener(etlService Etl_service.EtlService, requestService request.RequestService, mqCfg config.MQConfig) {
+	go listenRequestQueue(requestService, mqCfg)
+	go listenEtlQueue(etlService, mqCfg)
+}
+
+func listenRequestQueue(requestService request.RequestService, mqCfg config.MQConfig) {
+	conn, _, err := config.RabbitConn(mqCfg)
+	if err != nil {
+		log.Printf("MQ publisher error: %v", err)
+		return
+	}
+
+	const exchange = eventservice.ExchangeName
+	const routingKey = eventservice.RequestTopic
+	const queueName = "service.queue"
+
+	args := rabbitmq.WithConsumerOptionsQueueArgs(map[string]interface{}{
+		"x-dead-letter-exchange":    "events.failover",
+		"x-dead-letter-routing-key": "Request.process.failover",
+		"x-message-ttl":             2000,
+	})
+
+	consumer, err := rabbitmq.NewConsumer(
+		conn, queueName,
+		rabbitmq.WithConsumerOptionsQueueDurable,
+		rabbitmq.WithConsumerOptionsExchangeName(exchange),
+		rabbitmq.WithConsumerOptionsExchangeKind("topic"),
+		rabbitmq.WithConsumerOptionsRoutingKey(routingKey),
+		rabbitmq.WithConsumerOptionsQOSPrefetch(5),
+		rabbitmq.WithConsumerOptionsConcurrency(5),
+		args,
+	)
+	if err != nil {
+		log.Fatalf("❌ NewConsumer: %v", err)
+	}
+
+	err = consumer.Run(func(d rabbitmq.Delivery) rabbitmq.Action {
+		var evt eventservice.RequestProcessEvent
+		if err := json.Unmarshal(d.Body, &evt); err != nil {
+			return rabbitmq.NackDiscard
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := requestService.ProcessCtx(ctx, evt.RequestID, evt.ClientAccountId, evt.TypeIngress); err != nil {
+			return rabbitmq.NackRequeue
+		}
+		return rabbitmq.Ack
+	})
+	if err != nil {
+		log.Fatalf("❌ Error en consumer.Run: %v", err)
+	}
+}
+
+func listenEtlQueue(etlService Etl_service.EtlService, mqCfg config.MQConfig) {
+	conn, _, err := config.RabbitConn(mqCfg)
+	if err != nil {
+		log.Printf("MQ publisher error: %v", err)
+		return
+	}
+
+	const exchange = eventservice.ExchangeName
+	const routingKey = eventservice.EtlProduct // p. ej. "etl.product.created"
+	const queueName = routingKey
+
+	consumer, err := rabbitmq.NewConsumer(
+		conn, queueName,
+		rabbitmq.WithConsumerOptionsExchangeName(exchange),
+		rabbitmq.WithConsumerOptionsExchangeKind("topic"),
+		rabbitmq.WithConsumerOptionsRoutingKey(routingKey),
+		rabbitmq.WithConsumerOptionsQOSPrefetch(1),
+		rabbitmq.WithConsumerOptionsConcurrency(1),
+		rabbitmq.WithConsumerOptionsConsumerName("etl-product-consumer"),
+	)
+	if err != nil {
+		log.Fatalf("❌ NewConsumer: %v", err)
+	}
+
+	err = consumer.Run(func(d rabbitmq.Delivery) rabbitmq.Action {
+		var evt eventservice.ProductEvent
+		if err := json.Unmarshal(d.Body, &evt); err != nil {
+			log.Printf("❌ ETL payload inválido: %v", err)
+			return rabbitmq.NackDiscard
 		}
 
-		const queueName = "service.queue"
-		const routingKey = eventservice.RequestTopic
-		const exchange = eventservice.ExchangeName
+		etlService.StartETLConsumer(evt)
 
-		args := rabbitmq.WithConsumerOptionsQueueArgs(map[string]interface{}{
-			"x-dead-letter-exchange":    "events.failover",
-			"x-dead-letter-routing-key": "Request.process.failover",
-			// Si prefieres TTL por cola:
-			"x-message-ttl": 2000,
-		})
-
-		consumerClient, err := rabbitmq.NewConsumer(
-			conn,
-			queueName,
-			rabbitmq.WithConsumerOptionsLogging,
-			rabbitmq.WithConsumerOptionsExchangeName(exchange),
-			rabbitmq.WithConsumerOptionsExchangeKind("topic"),
-			// 👇 sin QueueDeclare (no tocar la cola existente)
-			rabbitmq.WithConsumerOptionsQueueDurable,
-			rabbitmq.WithConsumerOptionsRoutingKey(routingKey),
-			rabbitmq.WithConsumerOptionsQOSPrefetch(5),
-			rabbitmq.WithConsumerOptionsConcurrency(5),
-			args,
-			rabbitmq.WithConsumerOptionsConsumerName("api-stock-consumer"),
-		)
-		if err != nil {
-			log.Fatalf("❌ NewConsumer: %v", err)
-		}
-
-		// Run(handler) SIN opciones
-		err = consumerClient.Run(func(d rabbitmq.Delivery) rabbitmq.Action {
-			// 1) anti-panic (no mates el worker)
-			defer func() {
-				if r := recover(); r != nil {
-					log.Printf("panic in consumer: %v\n%s", r, debug.Stack())
-				}
-			}()
-
-			// 2) parsear el evento ANTES de usar evt.*
-			var evt eventservice.RequestProcessEvent
-			if err := json.Unmarshal(d.Body, &evt); err != nil {
-				log.Printf("❌ payload inválido: %v", err)
-				// si el mensaje está mal formado, no conviene reencolarlo
-				return rabbitmq.NackDiscard
-			}
-
-			// 3) timeout para el trabajo de negocio
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			start := time.Now()
-			if err := requestService.ProcessCtx(ctx, evt.RequestID, evt.ClientAccountId, evt.TypeIngress); err != nil {
-				log.Printf("❌ handler err: %v (elapsed %s)", err, time.Since(start))
-				// si el error es transitorio (DB down, timeouts), reencola:
-				return rabbitmq.NackRequeue
-				// si detectas error permanente, usa: return rabbitmq.NackDiscard
-			}
-
-			log.Printf("✅ ok rk=%s elapsed=%s", d.RoutingKey, time.Since(start))
-			return rabbitmq.Ack
-		})
-		if err != nil {
-			log.Fatalf("❌ Error en consumer.Run: %v", err)
-		}
-	}()
+		log.Printf("✅ ETL product procesado correctamente: %s", evt.ProductoID)
+		return rabbitmq.Ack
+	})
+	if err != nil {
+		log.Fatalf("❌ Error en consumer.Run (ETL): %v", err)
+	}
 }
