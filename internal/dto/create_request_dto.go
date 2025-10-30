@@ -38,11 +38,12 @@ type RequestDto struct {
 }
 
 type Movements struct {
-	Id        uuid.UUID `json:"id"`
-	Nombre    string    `json:"nombre"`
-	Count     int       `json:"count"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Id           uuid.UUID `json:"id"`
+	Nombre       string    `json:"nombre"`
+	Count        int       `json:"count"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	TypeMovement int       `json:"type_movement"`
 }
 
 type ProductDto struct {

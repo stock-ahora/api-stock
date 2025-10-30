@@ -42,10 +42,11 @@ func (m movementService) List(productId uuid.UUID, page, size int) (dto.Page[dto
 	items := make([]dto.Movements, 0, len(movements))
 	for _, req := range movements {
 		items = append(items, dto.Movements{
-			Id:        req.ID,
-			Count:     req.Count,
-			CreatedAt: req.CreatedAt,
-			UpdatedAt: req.UpdatedAt,
+			Id:           req.ID,
+			Count:        req.Count,
+			CreatedAt:    req.CreatedAt,
+			UpdatedAt:    req.UpdatedAt,
+			TypeMovement: req.MovementTypeID,
 		})
 	}
 
