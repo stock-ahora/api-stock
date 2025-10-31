@@ -51,7 +51,7 @@ func (b *Service) FormatProduct(ctx context.Context, input string, promptPremili
       }
     }`, prompt)
 
-	resp, err := b.client.InvokeModel(ctx, &bedrockruntime.InvokeModelInput{
+	resp, err := b.client.InvokeModel(context.Background(), &bedrockruntime.InvokeModelInput{
 		ModelId:     aws.String(NOVA_PRO_AWS),
 		ContentType: aws.String("application/json"),
 		Accept:      aws.String("application/json"),

@@ -25,11 +25,18 @@ func (e EtlService) StartETLConsumer(evt eventservice.ProductEvent) {
 
 	solicitudID := e.getSolicitudId(evt, clienteID)
 
+	var typeMovement int
+	if evt.Signo == 1 {
+		typeMovement = 7 // entrada
+	} else {
+		typeMovement = 8 // salida
+	}
+
 	// Insertar fila en la tabla de hechos
 	e.Db.Exec(`
-      INSERT INTO fact_product_movement (producto_id, cliente_id, cantidad, signo, tipo_movimiento_id, fecha_key, solicitudID, created_at)
-      VALUES (?, ?, ?, ?, (SELECT id FROM dim_tipo_movimiento WHERE nombre = ? LIMIT 1), ?, ?, NOW())
-    `, productoID, clienteID, evt.Cantidad, evt.Signo, evt.TipoMovimiento, fechaKey, solicitudID)
+      INSERT INTO fact_product_movement (producto_id, cliente_id, cantidad, signo, tipo_movimiento_id, fecha_key, solicitud_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+    `, productoID, clienteID, evt.Cantidad, evt.Signo, typeMovement, fechaKey, solicitudID)
 
 }
 
