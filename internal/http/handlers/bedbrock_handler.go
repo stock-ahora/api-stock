@@ -51,13 +51,13 @@ func (h *BedbrockHandler) listLast2MonthsMovements(ctx context.Context, productI
 
 	var product models.Product
 
-	err := h.Db.WithContext(ctx).First(&product, "id = ?", productId).Error
+	err := h.Db.First(&product, "id = ?", productId).Error
 	if err != nil {
 		return nil, models.Product{}, err
 	}
 
 	var ms []models.Movement
-	err = h.Db.WithContext(ctx).
+	err = h.Db.
 		// Si prefieres filtrar por date_limit, cambia "created_at" por "date_limit"
 		Where("create_at >= ?", twoMonthsAgo).
 		Where("product_id = ?", productId).

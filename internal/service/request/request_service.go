@@ -58,7 +58,7 @@ func (r requestService) List(ctx context.Context, clientAccountId uuid.UUID, pag
 	offset := (page - 1) * size
 
 	var total int64
-	if err := db.WithContext(ctx).Model(&models.Request{}).
+	if err := db.Model(&models.Request{}).
 		Where("client_account_id = ?", clientAccountId).
 		Count(&total).Error; err != nil {
 		return dto.Page[dto.RequestListDto]{}, err
@@ -66,7 +66,7 @@ func (r requestService) List(ctx context.Context, clientAccountId uuid.UUID, pag
 
 	// DATA
 	var requests []models.Request
-	if err := db.WithContext(ctx).
+	if err := db.
 		Where("client_account_id = ?", clientAccountId).
 		Order("create_at DESC").
 		Limit(size).
@@ -123,7 +123,7 @@ func (r requestService) Create(requestDto *dto.CreateRequestDto, ctx context.Con
 		CreatedAt: time.Now(),
 	}
 
-	err = db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Debug().Create(&request).Error; err != nil {
 			return err
 		}
@@ -151,14 +151,14 @@ func (r requestService) Get(ctx context.Context, requestId uuid.UUID) (dto.Reque
 	db := config.GetDB()
 
 	var request models.Request
-	Request := db.WithContext(ctx).Preload("Documents").First(&request, "id = ?", requestId)
+	Request := db.Preload("Documents").First(&request, "id = ?", requestId)
 	if Request.Error != nil {
 		return dto.RequestDto{}, Request.Error
 	}
 
 	var rpp []models.RequestPerProduct
 
-	err := db.WithContext(ctx).
+	err := db.
 		Preload("Product").
 		Preload("Movement").
 		Where("request_id = ?", requestId).
@@ -208,7 +208,7 @@ func (r requestService) Process(ctx context.Context, requestId uuid.UUID, client
 	log.Printf("Procesando solicitud con ID: %s", requestId)
 
 	var request models.Request
-	result := db.WithContext(ctx).Preload("Documents").First(&request, "id = ?", requestId)
+	result := db.Preload("Documents").First(&request, "id = ?", requestId)
 	log.Printf("Resultado de la consulta: %+v", result)
 	if result.Error != nil {
 		log.Printf("Error al obtener la solicitud: %v", result.Error)
@@ -251,7 +251,7 @@ func (r requestService) Process(ctx context.Context, requestId uuid.UUID, client
 
 	r.updateProduct(ctx, *resultBedrock, db, typeIngress, clientAccountId, requestId)
 
-	db.WithContext(ctx).Save(&request)
+	db.Save(&request)
 
 	return nil
 }
@@ -272,11 +272,11 @@ func (r requestService) updateProduct(ctx context.Context, productsFind []bedroc
 		if existSku {
 			countUpdate := product.Count * typeIngress
 
-			_ = db.WithContext(ctx).First(&productUpdate, "id = ?", &requestSku.ProductID)
+			_ = db.First(&productUpdate, "id = ?", &requestSku.ProductID)
 
 			productUpdate.Stock = productUpdate.Stock + countUpdate
 
-			db.WithContext(ctx).Save(&productUpdate)
+			db.Save(&productUpdate)
 			db.Commit()
 		} else {
 
@@ -287,7 +287,7 @@ func (r requestService) updateProduct(ctx context.Context, productsFind []bedroc
 			productUpdate.Status = "active"
 			productUpdate.ClientAccount = clientAccountId
 
-			db.WithContext(ctx).Create(&productUpdate)
+			db.Create(&productUpdate)
 
 			db.Save(&productUpdate)
 			db.Commit()
@@ -297,7 +297,7 @@ func (r requestService) updateProduct(ctx context.Context, productsFind []bedroc
 			requestSku.ProductID = productUpdate.ID
 			requestSku.CreatedAt = time.Now()
 
-			db.WithContext(ctx).Create(&requestSku)
+			db.Create(&requestSku)
 
 			db.Save(&requestSku)
 			db.Commit()
@@ -369,7 +369,7 @@ func findSku(product bedrock.ProductResponse, db *gorm.DB, requestSku *models.Sk
 
 		skuNormalized := normalizeSKU(sku)
 
-		resultSku := db.WithContext(ctx).Where("name_sku ILIKE ?", "%"+skuNormalized+"%").Find(&requestSku)
+		resultSku := db.Where("name_sku ILIKE ?", "%"+skuNormalized+"%").Find(&requestSku)
 		if resultSku.Error != nil {
 			log.Printf("Error al procesar con Bedrock: %v", resultSku.Error)
 		}
