@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/aws/smithy-go"
 	"github.com/google/uuid"
@@ -360,7 +362,9 @@ func notificationMovement() {
 func findSku(product bedrock.ProductResponse, db *gorm.DB, requestSku *models.Sku, existSku bool, ctx context.Context) bool {
 	for _, sku := range product.SKUs {
 
-		resultSku := db.WithContext(ctx).Where("name_sku ILIKE ?", "%"+sku+"%").Find(&requestSku)
+		skuNormalized := normalizeSKU(sku)
+
+		resultSku := db.WithContext(ctx).Where("name_sku ILIKE ?", "%"+skuNormalized+"%").Find(&requestSku)
 		if resultSku.Error != nil {
 			log.Printf("Error al procesar con Bedrock: %v", resultSku.Error)
 		}
@@ -371,4 +375,19 @@ func findSku(product bedrock.ProductResponse, db *gorm.DB, requestSku *models.Sk
 
 	}
 	return existSku
+}
+
+func normalizeSKU(s string) string {
+	s = strings.ToUpper(s)
+	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ReplaceAll(s, "-", "")
+	s = strings.ReplaceAll(s, "_", "")
+	// Elimina caracteres no alfanuméricos
+	s = strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			return r
+		}
+		return -1
+	}, s)
+	return s
 }
