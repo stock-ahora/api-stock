@@ -277,7 +277,7 @@ func (r requestService) updateProduct(ctx context.Context, productsFind []bedroc
 			productUpdate.Stock = productUpdate.Stock + countUpdate
 
 			db.WithContext(ctx).Save(&productUpdate)
-
+			db.Commit()
 		} else {
 
 			productUpdate.ID = uuid.New()
@@ -289,6 +289,8 @@ func (r requestService) updateProduct(ctx context.Context, productsFind []bedroc
 
 			db.WithContext(ctx).Create(&productUpdate)
 
+			db.Save(&productUpdate)
+			db.Commit()
 			requestSku.ID = uuid.New()
 			requestSku.NameSku = product.SKUs[0]
 			requestSku.Status = true
@@ -296,13 +298,16 @@ func (r requestService) updateProduct(ctx context.Context, productsFind []bedroc
 			requestSku.CreatedAt = time.Now()
 
 			db.WithContext(ctx).Create(&requestSku)
+
+			db.Save(&requestSku)
+			db.Commit()
 		}
 
 		movement := createMovement(productUpdate, product.Count, typeIngress)
-
+		db.Commit()
 		listMovement = append(listMovement, movement)
 		r.publicProductEtl(productUpdate, requestSku, clientAccountId, movement, typeIngress, requestId)
-
+		db.Commit()
 	}
 
 	movementsRequest := eventservice.MovementsEvent{
