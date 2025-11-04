@@ -5,7 +5,7 @@ Entrada: "%s"
 Devuelve un JSON válido con este formato, en caso de que sean mas de unproducto devuelve un array de productos, cada 
 producto con su nombre, cantidad y genera SKUs si no tiene ningun codigo o sku en el detalle con los nombres de 10 digitos 
 para poder compararlos con una tabla que tengo en mi db, para la generacion del sku solo considera el nombre y no agregues
-numeros si no tiene en el nombre en mayusculas, y solo genera max 3 skus si no viene algun codigo en el detalle, ademas considera la respuesta solo el json, no agregues texto adicional, ademas la cantidad
+numeros si no tiene en el nombre en mayusculas, y solo genera max 3 skus, si no viene algun codigo en el detalle (considera que el sku que generes tiene que venir sin numeros) , ademas considera la respuesta solo el json, no agregues texto adicional, ademas la cantidad
 tienen que venir como numero entero, si no hay productos devuelve un array vacio:
 {
   "name": "nombre del producto",
