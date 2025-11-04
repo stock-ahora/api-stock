@@ -93,6 +93,7 @@ func (d DashboardHandler) GetTopProducts(clientID int, limit int) ([]TopProduct,
 		Select("dp.nombre AS nombre_producto, SUM(f.cantidad) AS unidades").
 		Joins("JOIN dim_producto dp ON f.producto_id = dp.id").
 		Where("f.cliente_id = ?", clientID).
+		Where("f.tipo_movimiento_id = ?", 8).
 		Group("dp.nombre").
 		Order("unidades DESC").
 		Limit(limit).
