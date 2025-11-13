@@ -58,7 +58,7 @@ func NewRouter(s3Config config.UploadService, db *gorm.DB, dbStarts *gorm.DB, _ 
 	eventService := eventservice.NewMQPublisher(pub, urlConnectionMQ)
 
 	textractService := textract.NewTextractService(region)
-	requestService := request.NewRequestService(db, s3Svc, eventService, textractService)
+	requestService := request.NewRequestService(db, s3Svc, eventService, textractService, dbStarts)
 	handleRequest := &handlers.RequestHandler{Service: requestService}
 	handleStock := &handlers.StockHandler{Service: stockSvc}
 	handleChatBot := &handlers.BedbrockHandler{Db: db}

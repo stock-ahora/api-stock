@@ -33,10 +33,15 @@ type RequestService interface {
 }
 
 type requestService struct {
-	db       *gorm.DB
-	s3Svc    *s3.S3Svc
-	eventSvc *eventservice.MQPublisher
-	textract *textract.TextractService
+	db          *gorm.DB
+	db_estrella *gorm.DB
+	s3Svc       *s3.S3Svc
+	eventSvc    *eventservice.MQPublisher
+	textract    *textract.TextractService
+}
+
+func NewRequestService(db *gorm.DB, s3Svc *s3.S3Svc, eventSvc *eventservice.MQPublisher, textract *textract.TextractService, db_estrella *gorm.DB) RequestService {
+	return &requestService{db: db, db_estrella: db_estrella, s3Svc: s3Svc, eventSvc: eventSvc, textract: textract}
 }
 
 func (r requestService) Confirm(clientAccountId uuid.UUID, RequestPatch dto.RequestPatch) error {
@@ -51,10 +56,10 @@ func (r requestService) Confirm(clientAccountId uuid.UUID, RequestPatch dto.Requ
 
 	for _, m := range RequestPatch.Movements {
 		if m.Deleted {
-			deleteMovement(m, r.db)
+			deleteMovement(m, r.db, r.db_estrella)
 			continue
 		}
-		updateMovement(m, r.db)
+		updateMovement(m, r.db, r.db_estrella)
 
 	}
 
@@ -67,7 +72,7 @@ func (r requestService) Confirm(clientAccountId uuid.UUID, RequestPatch dto.Requ
 	return nil
 }
 
-func updateMovement(m dto.MovementsPatch, db *gorm.DB) {
+func updateMovement(m dto.MovementsPatch, db *gorm.DB, dbEstrella *gorm.DB) {
 
 	var movement models.Movement
 
@@ -89,9 +94,19 @@ func updateMovement(m dto.MovementsPatch, db *gorm.DB) {
 		log.Printf("Error actualizando movimiento %v: %v", m.ProductId, err)
 	}
 
+	err = dbEstrella.Exec("UPDATE dim_producto SET stock = stock + ? WHERE producto_uuid = ?", delta, m.ProductId).Error
+	if err != nil {
+		log.Printf("Error actualizando movimiento %v: %v", m.ProductId, err)
+	}
+
+	err = dbEstrella.Exec("UPDATE fact_product_movement SET cantidad = cantidad + ? WHERE movimiento_uuid = ?", m.Count, m.ProductId).Error
+	if err != nil {
+		log.Printf("Error actualizando movimiento %v: %v", m.ProductId, err)
+	}
+
 }
 
-func deleteMovement(m dto.MovementsPatch, db *gorm.DB) {
+func deleteMovement(m dto.MovementsPatch, db *gorm.DB, dbEstrella *gorm.DB) {
 
 	var movement models.Movement
 
@@ -117,6 +132,17 @@ func deleteMovement(m dto.MovementsPatch, db *gorm.DB) {
 	if err != nil {
 		log.Printf("Error actualizando movimiento %v: %v", m.ProductId, err)
 	}
+
+	err = dbEstrella.Exec("UPDATE dim_producto SET stock = stock + ? WHERE producto_uuid = ?", delta, m.ProductId).Error
+	if err != nil {
+		log.Printf("Error actualizando movimiento %v: %v", m.ProductId, err)
+	}
+
+	err = dbEstrella.Exec("UPDATE fact_product_movement SET cantidad = 0 WHERE movimiento_uuid = ?", m.ProductId).Error
+	if err != nil {
+		log.Printf("Error actualizando movimiento %v: %v", m.ProductId, err)
+	}
+
 }
 
 func (r requestService) ProcessCtx(ctx context.Context, requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) interface{} {
@@ -126,9 +152,6 @@ func (r requestService) ProcessCtx(ctx context.Context, requestId uuid.UUID, cli
 		return nil
 	}
 	return nil
-}
-func NewRequestService(db *gorm.DB, s3Svc *s3.S3Svc, eventSvc *eventservice.MQPublisher, textract *textract.TextractService) RequestService {
-	return &requestService{db: db, s3Svc: s3Svc, eventSvc: eventSvc, textract: textract}
 }
 
 func (r requestService) List(ctx context.Context, clientAccountId uuid.UUID, page, size int) (dto.Page[dto.RequestListDto], error) {
