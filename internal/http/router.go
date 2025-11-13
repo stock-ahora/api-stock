@@ -37,7 +37,7 @@ func NewRouter(s3Config config.UploadService, db *gorm.DB, dbStarts *gorm.DB, _ 
 	r.Use(middleware.Logger)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"}, // ← acepta cualquier origen
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"*"}, // ← acepta cualquier header
 		ExposedHeaders:   []string{"*"},
 		AllowCredentials: false,
