@@ -25,6 +25,7 @@ type RequestService interface {
 	List(ctx context.Context, clientAccountId uuid.UUID, page, size int) (dto.Page[dto.RequestListDto], error)
 	Create(*dto.CreateRequestDto, context.Context) (models.Request, error)
 	Get(ctx context.Context, uuid uuid.UUID) (dto.RequestDto, error)
+	Confirm(clientAccountId uuid.UUID, RequestPatch dto.RequestPatch) error
 	//todo: agregar metodo para confirmar la request y agregar en el open api el metodo igual
 	//todo: agregar metodo para modificar la request
 	Process(ctx context.Context, requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) error
@@ -38,6 +39,86 @@ type requestService struct {
 	textract *textract.TextractService
 }
 
+func (r requestService) Confirm(clientAccountId uuid.UUID, RequestPatch dto.RequestPatch) error {
+	var request models.Request
+
+	result := r.db.First(&request, "id = ? AND client_account_id = ?", RequestPatch.Id, clientAccountId)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	request.Status = models.RequestStatusApproved
+
+	for _, m := range RequestPatch.Movements {
+		if m.Deleted {
+			deleteMovement(m, r.db)
+			continue
+		}
+		updateMovement(m, r.db)
+
+	}
+
+	result = r.db.Model(&request).Update("status", models.RequestStatusApproved)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
+}
+
+func updateMovement(m dto.MovementsPatch, db *gorm.DB) {
+
+	var movement models.Movement
+
+	result := db.First(&movement, "id = ?", m.Id)
+	if result.Error != nil {
+		log.Println("Error obteniendo movimiento:", result.Error)
+		return
+	}
+
+	delta := dto.GetTypeMovementForDeltaUpdate(m.TypeMovementId) * (m.Count - movement.Count)
+
+	err := db.Exec("UPDATE movement SET count = ? WHERE id = ?", m.Count, m.Id).Error
+	if err != nil {
+		log.Printf("Error actualizando movimiento %v: %v", m.ProductId, err)
+	}
+
+	err = db.Exec("UPDATE product SET stock = stock + ? WHERE id = ?", delta, m.ProductId).Error
+	if err != nil {
+		log.Printf("Error actualizando movimiento %v: %v", m.ProductId, err)
+	}
+
+}
+
+func deleteMovement(m dto.MovementsPatch, db *gorm.DB) {
+
+	var movement models.Movement
+
+	result := db.First(&movement, "id = ?", m.Id)
+	if result.Error != nil {
+		log.Println("Error obteniendo movimiento:", result.Error)
+		return
+	}
+
+	result = db.Exec("DELETE FROM request_per_product WHERE movement_id = ?", m.Id)
+	if result.Error != nil {
+		log.Println("Error eliminando:", result.Error)
+	}
+
+	result = db.Exec("DELETE FROM movement WHERE id = ?", m.Id)
+	if result.Error != nil {
+		log.Println("Error eliminando:", result.Error)
+	}
+
+	delta := dto.GetTypeMovementForDeltaDelete(m.TypeMovementId) * movement.Count
+
+	err := db.Exec("UPDATE product SET stock = stock + ? WHERE id = ?", delta, m.ProductId).Error
+	if err != nil {
+		log.Printf("Error actualizando movimiento %v: %v", m.ProductId, err)
+	}
+}
+
 func (r requestService) ProcessCtx(ctx context.Context, requestId uuid.UUID, clientAccountId uuid.UUID, typeIngress int) interface{} {
 
 	err := r.Process(ctx, requestId, clientAccountId, typeIngress)
@@ -46,7 +127,6 @@ func (r requestService) ProcessCtx(ctx context.Context, requestId uuid.UUID, cli
 	}
 	return nil
 }
-
 func NewRequestService(db *gorm.DB, s3Svc *s3.S3Svc, eventSvc *eventservice.MQPublisher, textract *textract.TextractService) RequestService {
 	return &requestService{db: db, s3Svc: s3Svc, eventSvc: eventSvc, textract: textract}
 }

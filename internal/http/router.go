@@ -133,6 +133,7 @@ func initRequestRoutes(r *chi.Mux, requestService *handlers.RequestHandler) {
 		r.Get("/", requestService.List)
 		r.Post("/", requestService.Create)
 		r.Get("/{id}", requestService.Get)
+		r.Patch("/", requestService.Update)
 	})
 }
 

@@ -91,6 +91,30 @@ func GetTypeMovementString(movement int) string {
 
 }
 
+func GetTypeMovementForDeltaDelete(movement int) int {
+	switch movement {
+	case 1:
+		return -1
+	case 2:
+		return 1
+	default:
+		return 1
+	}
+
+}
+
+func GetTypeMovementForDeltaUpdate(movement int) int {
+	switch movement {
+	case 1:
+		return 1
+	case 2:
+		return -1
+	default:
+		return 1
+	}
+
+}
+
 func (s CreateRequestDto) GetTypeStatus() int {
 	return int(s.Type) + 1
 }
@@ -117,4 +141,17 @@ type Page[T any] struct {
 	Page       int   `json:"page"`
 	Size       int   `json:"size"`
 	TotalPages int   `json:"total_pages"`
+}
+
+type MovementsPatch struct {
+	Id             uuid.UUID `json:"id"`
+	Count          int       `json:"count"`
+	ProductId      uuid.UUID `json:"productId"`
+	TypeMovementId int       `json:"typeMovementId"`
+	Deleted        bool      `json:"deleted"`
+}
+
+type RequestPatch struct {
+	Id        uuid.UUID        `json:"id"`
+	Movements []MovementsPatch `json:"movements"`
 }

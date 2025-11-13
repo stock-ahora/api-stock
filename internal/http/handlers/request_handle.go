@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -119,6 +120,39 @@ func (h *RequestHandler) Get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	json.NewEncoder(w).Encode(req)
+}
+
+func (h *RequestHandler) Update(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	clientAccountID, err, done := getClientAccountIdHeader(w, r)
+	if done {
+		return
+	}
+
+	// 1. Decodificar el body JSON al struct
+	var reqBody dto.RequestPatch
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// (Opcional) Validar que el ID principal no venga vacío
+	if reqBody.Id == uuid.Nil {
+		http.Error(w, "Request ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Llamar al servicio con la info obtenida
+	err = h.Service.Confirm(clientAccountID, reqBody)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 3. Respuesta OK
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"message":"updated"}`))
 }
 
 func detectContentType(file multipart.File, header *multipart.FileHeader) string {
