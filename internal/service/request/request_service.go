@@ -328,9 +328,11 @@ func (r requestService) Process(ctx context.Context, requestId uuid.UUID, client
 	log.Printf("Resultado de Bedrock para la solicitud %s: %+v", requestId, resultBedrock)
 
 	request.Status = models.RequestStatusPending
-
-	r.updateProduct(ctx, *resultBedrock, db, typeIngress, clientAccountId, requestId)
-
+	if len(*resultBedrock) > 0 {
+		r.updateProduct(ctx, *resultBedrock, db, typeIngress, clientAccountId, requestId)
+	} else {
+		request.Status = models.RequestStatusRejected
+	}
 	db.Save(&request)
 
 	return nil
