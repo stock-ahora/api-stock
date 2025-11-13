@@ -34,7 +34,6 @@ const DashboardPath = "/prod/api/v1" + "/dashboard"
 
 func NewRouter(s3Config config.UploadService, db *gorm.DB, dbStarts *gorm.DB, _ any, _ any, region string, _ string, mqConfig config.MQConfig) *chi.Mux {
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"}, // ← acepta cualquier origen
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
