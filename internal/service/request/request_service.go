@@ -251,11 +251,13 @@ func (r requestService) Get(ctx context.Context, requestId uuid.UUID) (dto.Reque
 	movements := make([]dto.Movements, 0, len(rpp))
 	for _, x := range rpp {
 		movements = append(movements, dto.Movements{
-			Id:        x.Movement.ID,
-			Nombre:    x.Product.Name,
-			Count:     x.Movement.Count,
-			CreatedAt: x.Movement.CreatedAt,
-			UpdatedAt: x.Movement.UpdatedAt,
+			Id:             x.Movement.ID,
+			ProductId:      x.Product.ID,
+			Nombre:         x.Product.Name,
+			MovementTypeId: x.Movement.MovementTypeID,
+			Count:          x.Movement.Count,
+			CreatedAt:      x.Movement.CreatedAt,
+			UpdatedAt:      x.Movement.UpdatedAt,
 		})
 	}
 
