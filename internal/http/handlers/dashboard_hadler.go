@@ -29,7 +29,7 @@ func (d DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(result)
 	case "topProducts":
 
-		result, _ := d.GetTopProducts(clienteID, 7)
+		result, _ := d.GetTopProducts(clienteID, 7, r)
 		json.NewEncoder(w).Encode(result)
 
 	case "stockTrend":
@@ -83,23 +83,59 @@ func (d DashboardHandler) GetMovementOverTime(clientID int) ([]MovementOverTime,
 
 type TopProduct struct {
 	NombreProducto string `json:"nombre_producto"`
-	Unidades       int64  `json:"unidades"`
+	Egresos        int64  `json:"egresos"`
+	Ingresos       int64  `json:"ingresos"`
+	Total          int64  `json:"total"`
 }
 
-func (d DashboardHandler) GetTopProducts(clientID int, limit int) ([]TopProduct, error) {
+func (d DashboardHandler) GetTopProducts(clientID int, limit int, r *http.Request) ([]TopProduct, error) {
 	var results []TopProduct
 
-	err := d.Db.Table("fact_product_movement f").
-		Select("dp.nombre AS nombre_producto, SUM(dp.stock) AS unidades").
+	startDate, endDate, _ := parseDateParams(r)
+
+	query := d.Db.Table("fact_product_movement f").
+		Select(`dp.id, dp.nombre AS nombre_producto,
+		SUM(CASE WHEN f.tipo_movimiento_id = 8 THEN f.cantidad ELSE 0 END) AS egresos,
+		SUM(CASE WHEN f.tipo_movimiento_id = 7 THEN f.cantidad ELSE 0 END) AS ingresos,
+		SUM(f.cantidad) AS total`).
 		Joins("JOIN dim_producto dp ON f.producto_id = dp.id").
-		Where("f.cliente_id = ?", clientID).
-		Where("f.tipo_movimiento_id = ?", 8).
-		Group("dp.nombre").
-		Order("unidades DESC").
+		Joins("JOIN dim_fecha df ON df.fecha_key = f.fecha_key").
+		Where("f.cliente_id = ?", clientID)
+
+	if !startDate.IsZero() && !endDate.IsZero() {
+		query = query.Where("df.fecha BETWEEN ? AND ?", startDate, endDate)
+	}
+
+	err := query.
+		Group("dp.nombre, dp.id").
+		Order("total DESC").
 		Limit(limit).
 		Scan(&results).Error
 
 	return results, err
+}
+
+func parseDateParams(r *http.Request) (time.Time, time.Time, error) {
+	layout := "2006-01-02"
+	startStr := r.URL.Query().Get("start")
+	endStr := r.URL.Query().Get("end")
+
+	var startDate, endDate time.Time
+	var err error
+
+	if startStr != "" {
+		startDate, err = time.Parse(layout, startStr)
+		if err != nil {
+			return time.Time{}, time.Time{}, err
+		}
+	}
+	if endStr != "" {
+		endDate, err = time.Parse(layout, endStr)
+		if err != nil {
+			return time.Time{}, time.Time{}, err
+		}
+	}
+	return startDate, endDate, nil
 }
 
 type StockTrend struct {
