@@ -83,6 +83,7 @@ func initDashboardRoutes(r *chi.Mux, dashboard *handlers.DashboardHandler) {
 
 	r.Route(DashboardPath, func(r chi.Router) {
 		r.Get("/", dashboard.Get)
+		r.Get("/get-product", dashboard.GetProduct)
 	})
 
 }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,7 +26,7 @@ func (d DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	switch typeRequest {
 	case "movementOverTime":
-		result, _ := d.GetMovementOverTime(clienteID)
+		result, _ := d.GetMovementOverTime(clienteID, r)
 		json.NewEncoder(w).Encode(result)
 	case "topProducts":
 
@@ -60,23 +61,66 @@ func (d DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 type MovementOverTime struct {
-	Fecha    time.Time `json:"fecha"`
+	Periodo  time.Time `json:"periodo"`
+	Mes      string    `json:"mes"`
 	Ingresos int64     `json:"ingresos"`
 	Egresos  int64     `json:"egresos"`
 }
 
-func (d DashboardHandler) GetMovementOverTime(clientID int) ([]MovementOverTime, error) {
+func (d DashboardHandler) GetMovementOverTime(clientID int, r *http.Request) ([]MovementOverTime, error) {
 	var results []MovementOverTime
 
-	err := d.Db.Table("fact_product_movement f").
-		Select(`"df".fecha as fecha, `+
-			`SUM(CASE WHEN f.signo = 1 THEN f.cantidad ELSE 0 END) AS ingresos, `+
-			`SUM(CASE WHEN f.signo = -1 THEN f.cantidad ELSE 0 END) AS egresos`).
-		Joins("JOIN dim_fecha df ON f.fecha_key = df.fecha_key").
-		Where("f.cliente_id = ?", clientID).
-		Group("df.fecha").
-		Order("df.fecha").
-		Scan(&results).Error
+	startDate, endDate, _ := parseDateParams(r)
+	period := r.URL.Query().Get("period") // "week" o "month"
+	if period != "week" {
+		period = "month"
+	}
+	productoId := r.URL.Query().Get("productoId")
+
+	// Construir WHERE dinámico según parámetros opcionales
+	whereClause := " WHERE f.cliente_id = ?"
+	args := []interface{}{period, clientID}
+
+	if !startDate.IsZero() && !endDate.IsZero() {
+		whereClause += " AND df.fecha BETWEEN ? AND ?"
+		args = append(args, startDate, endDate)
+	}
+	if productoId != "" {
+		if pid, err := strconv.Atoi(productoId); err == nil {
+			whereClause += " AND f.producto_id = ?"
+			args = append(args, pid)
+		}
+	}
+
+	query := `
+WITH base AS (
+    SELECT
+        CASE WHEN ? = 'week' THEN date_trunc('week', df.fecha) ELSE date_trunc('month', df.fecha) END AS periodo,
+        f.tipo_movimiento_id,
+        f.cantidad
+    FROM fact_product_movement f
+    JOIN dim_fecha df ON f.fecha_key = df.fecha_key` + whereClause + `
+)
+SELECT
+    periodo,
+    (ARRAY['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'])[date_part('month', periodo)::int] AS mes,
+    SUM(CASE WHEN tipo_movimiento_id = 7 THEN cantidad ELSE 0 END) AS ingresos,
+    SUM(CASE WHEN tipo_movimiento_id = 8 THEN cantidad ELSE 0 END) AS egresos
+FROM base
+GROUP BY periodo
+ORDER BY periodo;`
+
+	err := d.Db.Raw(query, args...).Scan(&results).Error
+
+	if period == "week" && err == nil && !startDate.IsZero() && !endDate.IsZero() {
+		filtered := make([]MovementOverTime, 0, len(results))
+		for _, it := range results {
+			if !it.Periodo.Before(startDate) && !it.Periodo.After(endDate) {
+				filtered = append(filtered, it)
+			}
+		}
+		results = filtered
+	}
 
 	return results, err
 }
@@ -220,4 +264,20 @@ func (d DashboardHandler) GetDimClienteID(uuid uuid.UUID) (int, error) {
 		return 0, err
 	}
 	return cliente.ID, nil
+}
+
+func (d DashboardHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
+	var results []products
+
+	_ = d.Db.Table("dim_producto dp").
+		Select("dp.nombre as name, dp.id as id").
+		Scan(&results).Error
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
+
+type products struct {
+	Name string `json:"name"`
+	Id   int    `json:"id"`
 }
