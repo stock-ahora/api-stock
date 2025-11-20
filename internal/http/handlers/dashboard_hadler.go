@@ -61,10 +61,11 @@ func (d DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 type MovementOverTime struct {
-	Periodo  time.Time `json:"periodo"`
-	Mes      string    `json:"mes"`
-	Ingresos int64     `json:"ingresos"`
-	Egresos  int64     `json:"egresos"`
+	Periodo        time.Time `json:"periodo"`
+	Mes            string    `json:"mes"`
+	Ingresos       int64     `json:"ingresos"`
+	Egresos        int64     `json:"egresos"`
+	StockAcumulado int64     `json:"stock_acumulado"`
 }
 
 func (d DashboardHandler) GetMovementOverTime(clientID int, r *http.Request) ([]MovementOverTime, error) {
@@ -97,18 +98,29 @@ WITH base AS (
     SELECT
         CASE WHEN ? = 'week' THEN date_trunc('week', df.fecha) ELSE date_trunc('month', df.fecha) END AS periodo,
         f.tipo_movimiento_id,
-        f.cantidad
+        f.cantidad,
+        (f.cantidad * f.signo) AS movimiento
     FROM fact_product_movement f
     JOIN dim_fecha df ON f.fecha_key = df.fecha_key` + whereClause + `
+),
+resumen AS (
+    SELECT
+        periodo,
+        SUM(CASE WHEN tipo_movimiento_id = 7 THEN cantidad ELSE 0 END) AS ingresos,
+        SUM(CASE WHEN tipo_movimiento_id = 8 THEN cantidad ELSE 0 END) AS egresos,
+        SUM(movimiento) AS movimiento_del_periodo
+    FROM base
+    GROUP BY periodo
 )
 SELECT
     periodo,
     (ARRAY['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'])[date_part('month', periodo)::int] AS mes,
-    SUM(CASE WHEN tipo_movimiento_id = 7 THEN cantidad ELSE 0 END) AS ingresos,
-    SUM(CASE WHEN tipo_movimiento_id = 8 THEN cantidad ELSE 0 END) AS egresos
-FROM base
-GROUP BY periodo
-ORDER BY periodo;`
+    ingresos,
+    egresos,
+    SUM(movimiento_del_periodo) OVER (ORDER BY periodo) AS stock_acumulado
+FROM resumen
+ORDER BY periodo;
+`
 
 	err := d.Db.Raw(query, args...).Scan(&results).Error
 
