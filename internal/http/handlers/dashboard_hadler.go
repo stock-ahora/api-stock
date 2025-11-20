@@ -124,15 +124,15 @@ ORDER BY periodo;
 
 	err := d.Db.Raw(query, args...).Scan(&results).Error
 
-	if period == "week" && err == nil && !startDate.IsZero() && !endDate.IsZero() {
-		filtered := make([]MovementOverTime, 0, len(results))
-		for _, it := range results {
-			if !it.Periodo.Before(startDate) && !it.Periodo.After(endDate) {
-				filtered = append(filtered, it)
-			}
-		}
-		results = filtered
-	}
+	//if period == "week" && err == nil && !startDate.IsZero() && !endDate.IsZero() {
+	//	filtered := make([]MovementOverTime, 0, len(results))
+	//	for _, it := range results {
+	//		if !it.Periodo.Before(startDate) && !it.Periodo.After(endDate) {
+	//			filtered = append(filtered, it)
+	//		}
+	//	}
+	//	results = filtered
+	//}
 
 	return results, err
 }
