@@ -270,7 +270,7 @@ func (d DashboardHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 	var results []products
 
 	_ = d.Db.Table("dim_producto dp").
-		Select("dp.nombre as name, dp.id as id").
+		Select("dp.nombre as name, dp.id as id, dp.producto_uuid as uuid").
 		Scan(&results).Error
 
 	w.Header().Set("Content-Type", "application/json")
@@ -278,6 +278,7 @@ func (d DashboardHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 }
 
 type products struct {
-	Name string `json:"name"`
-	Id   int    `json:"id"`
+	Name string    `json:"name"`
+	Id   int       `json:"id"`
+	Uuid uuid.UUID `json:"uuid"`
 }
