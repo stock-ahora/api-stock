@@ -51,6 +51,12 @@ type Movement struct {
 	Products []Product `gorm:"many2many:request_per_product;joinForeignKey:MovementID;joinReferences:ProductID"`
 }
 
+type Notification struct {
+	Message string `gorm:"type:varchar(1000);not null"`
+	Type    string `gorm:"type:varchar(100);not null"`
+	IsRead  bool   `gorm:"column:is_read"`
+}
+
 type RequestStatus string
 
 const (
@@ -71,6 +77,10 @@ func (s RequestStatus) IsValid() bool {
 
 func (Request) TableName() string {
 	return "request"
+}
+
+func (Notification) TableName() string {
+	return "notification"
 }
 
 func (Documents) TableName() string {

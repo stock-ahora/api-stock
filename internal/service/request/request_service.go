@@ -356,12 +356,20 @@ func (r requestService) Process(ctx context.Context, requestId uuid.UUID, client
 		log.Printf("len resultBedrock: %d", len(*resultBedrock))
 		r.updateProduct(ctx, *resultBedrock, db, typeIngress, clientAccountId, requestId)
 		request.Status = models.RequestStatusPending
+
+		shortID := strings.Split(request.ID.String(), "-")[0]
+
+		r.db.Exec(
+			"INSERT INTO public.notification (message, type, is_read) VALUES (?, ?, ?)",
+			"Solicitud de ingreso pendiente de revisión "+shortID,
+			"request",
+			false,
+		)
 	} else {
 		log.Printf("len resultBedrock: %d", len(*resultBedrock))
 		request.Status = models.RequestStatusRejected
 	}
 	db.Save(&request)
-
 	return nil
 }
 

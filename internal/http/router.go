@@ -29,6 +29,7 @@ const S3BasePath = APIBasePath + "/s3"
 const RequestBasePath = APIBasePath + "/request"
 const HealthPath = "/api/v1" + "/health"
 const MovementPath = APIBasePath + "/movement"
+const NotificationPath = APIBasePath + "/notification"
 const ChatBot = APIBasePath + "/chatbot"
 const DashboardPath = "/prod/api/v1" + "/dashboard"
 
@@ -62,7 +63,7 @@ func NewRouter(s3Config config.UploadService, db *gorm.DB, dbStarts *gorm.DB, _ 
 	handleStock := &handlers.StockHandler{Service: stockSvc}
 	handleChatBot := &handlers.BedbrockHandler{Db: db}
 	habdleDashboard := &handlers.DashboardHandler{Db: dbStarts}
-	movementHandler := &handlers.MovementHandler{Service: movementSvc}
+	movementHandler := &handlers.MovementHandler{Service: movementSvc, Db: db}
 	etlService := Etl_service.EtlService{Db: dbStarts}
 
 	configListener(etlService, requestService, mqConfig)
@@ -97,6 +98,7 @@ func initChatRoutes(r *chi.Mux, bot *handlers.BedbrockHandler) {
 func initMovementRoutes(r *chi.Mux, handler *handlers.MovementHandler) {
 	r.Route(MovementPath, func(r chi.Router) {
 		r.Get("/{id}", handler.List)
+		r.Get("/notification", handler.Notification)
 	})
 }
 
