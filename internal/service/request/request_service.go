@@ -94,6 +94,20 @@ func updateMovement(m dto.MovementsPatch, db *gorm.DB, dbEstrella *gorm.DB) {
 		log.Printf("Error actualizando movimiento %v: %v", m.ProductId, err)
 	}
 
+	var productUpdate models.Product
+
+	result = db.First(&productUpdate, "id = ?", m.ProductId)
+
+	var message = "Producto con peligro de stock " + productUpdate.Name + " Stock actual: " + fmt.Sprintf("%d", productUpdate.Stock)
+	var now = time.Now()
+	db.Exec(
+		"INSERT INTO public.notification (message, type, is_read, date) VALUES (?, ?, ?, ?)",
+		message,
+		"request",
+		false,
+		now,
+	)
+
 	err = dbEstrella.Exec("UPDATE dim_producto SET stock = stock + ? WHERE producto_uuid = ?", delta, m.ProductId).Error
 	if err != nil {
 		log.Printf("Error actualizando movimiento %v: %v", m.ProductId, err)
