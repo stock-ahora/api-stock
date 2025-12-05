@@ -52,9 +52,10 @@ type Movement struct {
 }
 
 type Notification struct {
-	Message string `gorm:"type:varchar(1000);not null"`
-	Type    string `gorm:"type:varchar(100);not null"`
-	IsRead  bool   `gorm:"column:is_read"`
+	Message string    `gorm:"type:varchar(1000);not null"`
+	Type    string    `gorm:"type:varchar(100);not null"`
+	IsRead  bool      `gorm:"column:is_read"`
+	Date    time.Time `gorm:"column:date"`
 }
 
 type RequestStatus string

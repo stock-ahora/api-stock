@@ -359,11 +359,14 @@ func (r requestService) Process(ctx context.Context, requestId uuid.UUID, client
 
 		shortID := strings.Split(request.ID.String(), "-")[0]
 
+		var now = time.Now()
+
 		r.db.Exec(
-			"INSERT INTO public.notification (message, type, is_read) VALUES (?, ?, ?)",
+			"INSERT INTO public.notification (message, type, is_read, date) VALUES (?, ?, ?, ?)",
 			"Solicitud de ingreso pendiente de revisión "+shortID,
 			"request",
 			false,
+			now,
 		)
 	} else {
 		log.Printf("len resultBedrock: %d", len(*resultBedrock))
@@ -392,6 +395,19 @@ func (r requestService) updateProduct(ctx context.Context, productsFind []bedroc
 			_ = db.First(&productUpdate, "id = ?", &requestSku.ProductID)
 
 			productUpdate.Stock = productUpdate.Stock + countUpdate
+
+			if productUpdate.Stock < 2 {
+
+				var message = "Producto con peligro de stock " + productUpdate.Name + " Stock actual: " + fmt.Sprintf("%d", productUpdate.Stock)
+				var now = time.Now()
+				r.db.Exec(
+					"INSERT INTO public.notification (message, type, is_read, date) VALUES (?, ?, ?, ?)",
+					message,
+					"request",
+					false,
+					now,
+				)
+			}
 
 			db.Save(&productUpdate) //
 		} else {
