@@ -103,7 +103,7 @@ func updateMovement(m dto.MovementsPatch, db *gorm.DB, dbEstrella *gorm.DB) {
 	db.Exec(
 		"INSERT INTO public.notification (message, type, is_read, date) VALUES (?, ?, ?, ?)",
 		message,
-		"request",
+		"product",
 		false,
 		now,
 	)
@@ -417,7 +417,7 @@ func (r requestService) updateProduct(ctx context.Context, productsFind []bedroc
 				r.db.Exec(
 					"INSERT INTO public.notification (message, type, is_read, date) VALUES (?, ?, ?, ?)",
 					message,
-					"request",
+					"product",
 					false,
 					now,
 				)
